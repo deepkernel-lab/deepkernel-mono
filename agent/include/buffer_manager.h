@@ -4,16 +4,21 @@
 #include <string>
 #include <vector>
 
-#include "syscall_event.h"
+#include "event_types.h"
 
 struct ContainerBuffer {
     std::string containerId;
-    uint64_t lastTsNs{0};
+    uint64_t windowStartTsNs{0};
+    uint64_t lastEventTsNs{0};
     std::vector<SyscallEvent> currentShortWindow;
+
+    // Long dump state
     bool isLongDumpActive{false};
     uint64_t longDumpStartTsNs{0};
+    uint64_t longDumpEndTsNs{0};
+    uint64_t lastDumpTsNs{0};
     std::ofstream longDumpStream;
 };
 
-// TODO: add buffer management logic and serialization helpers.
+// Buffer management helpers implemented in agent.cpp.
 
