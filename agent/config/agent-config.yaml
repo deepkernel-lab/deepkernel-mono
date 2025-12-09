@@ -1,0 +1,19 @@
+agentId: "node-1"
+serverUrl: "https://deepkernel-server:8443"
+nodeName: "worker-01"
+
+windows:
+  shortWindowSec: 5
+  sendIntervalSec: 5
+  minEventsPerWindow: 20
+
+longDump:
+  defaultDurationSec: 1200
+  dumpDir: "/var/lib/deepkernel/dumps"
+
+containers:
+  monitor: []
+  includeNamespaceRegex: ".*"
+
+# TODO: replace placeholder values with environment-specific settings.
+

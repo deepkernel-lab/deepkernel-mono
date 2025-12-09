@@ -1,0 +1,66 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.0' apply false
+    id 'io.spring.dependency-management' version '1.1.4'
+}
+
+allprojects {
+    group = 'com.deepkernel'
+    version = '0.1.0-SNAPSHOT'
+
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'io.spring.dependency-management'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
+    }
+
+    dependencies {
+        testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+    }
+
+    test {
+        useJUnitPlatform()
+    }
+}
+
+project(':core') {
+    apply plugin: 'org.springframework.boot'
+
+    dependencies {
+        implementation project(':contracts')
+    }
+}
+
+project(':anomaly-engine') {
+    dependencies {
+        implementation project(':contracts')
+    }
+}
+
+project(':triage-service') {
+    dependencies {
+        implementation project(':contracts')
+    }
+}
+
+project(':cicd-integration') {
+    dependencies {
+        implementation project(':contracts')
+    }
+}
+
+project(':policy-engine') {
+    dependencies {
+        implementation project(':contracts')
+    }
+}
+

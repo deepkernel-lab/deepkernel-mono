@@ -1,0 +1,11 @@
+rootProject.name = 'deepkernel-server'
+
+include(
+    'core',
+    'anomaly-engine',
+    'triage-service',
+    'cicd-integration',
+    'policy-engine',
+    'contracts'
+)
+

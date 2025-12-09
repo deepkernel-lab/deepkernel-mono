@@ -1,0 +1,8 @@
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    // Placeholder for serialization libs (e.g., Jackson) to be added later.
+}
+
