@@ -8,7 +8,8 @@
 class PolicyEnforcer {
 public:
     explicit PolicyEnforcer(const std::string& dockerSocketPath = "/var/run/docker.sock",
-                            const std::string& policyDir = "/var/lib/deepkernel/policies");
+                            const std::string& policyDir = "/var/lib/deepkernel/policies",
+                            const std::string& enforcementMode = "ERRNO");
 
     // Apply a policy to a container
     // Returns true if successful
@@ -24,6 +25,7 @@ public:
 private:
     std::string dockerSocketPath_;
     std::string policyDir_;
+    std::string enforcementMode_;  // "ERRNO" (block) or "LOG" (audit)
 
     struct AppliedPolicy {
         std::string containerId;

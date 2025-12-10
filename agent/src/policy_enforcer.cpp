@@ -27,10 +27,21 @@ uint64_t nowNs() {
 
 }  // namespace
 
-PolicyEnforcer::PolicyEnforcer(const std::string& dockerSocketPath, const std::string& policyDir)
-    : dockerSocketPath_(dockerSocketPath), policyDir_(policyDir) {
+PolicyEnforcer::PolicyEnforcer(const std::string& dockerSocketPath, const std::string& policyDir,
+                               const std::string& enforcementMode)
+    : dockerSocketPath_(dockerSocketPath), policyDir_(policyDir), enforcementMode_(enforcementMode) {
     // Create policy directory if it doesn't exist
     std::filesystem::create_directories(policyDir_);
+
+    // Validate enforcement mode
+    if (enforcementMode_ != "ERRNO" && enforcementMode_ != "LOG") {
+        std::cerr << "Warning: Invalid enforcement mode '" << enforcementMode_ 
+                  << "', defaulting to ERRNO\n";
+        enforcementMode_ = "ERRNO";
+    }
+
+    std::cout << "PolicyEnforcer: Enforcement mode = " << enforcementMode_ 
+              << (enforcementMode_ == "LOG" ? " (audit only, no blocking)" : " (active blocking)") << "\n";
 }
 
 bool PolicyEnforcer::apply(const std::string& containerName, const std::string& policyId,
@@ -124,59 +135,34 @@ std::string PolicyEnforcer::getAppliedPoliciesJson() const {
 }
 
 std::string PolicyEnforcer::generateSeccompProfile(const std::string& specJson) {
-    // Parse the spec and generate OCI-compliant Seccomp profile
-    // For demo, we'll create a simple deny profile based on the spec
-    
-    // Try to extract syscalls to deny from spec
-    // Expected format in spec: {"syscalls":[{"name":"connect","action":"SCMP_ACT_ERRNO"},...]}
-    
+    // Generate an OCI-like seccomp profile. For demo, focus on network threat:
+    // defaultAction: ALLOW, with a single rule on connect.
+    // - If enforcementMode_ == LOG -> SCMP_ACT_LOG
+    // - Else -> SCMP_ACT_ERRNO
+    // - Use an arg filter to target high ports (>=1024) to avoid blocking internal low ports.
+
     std::ostringstream profile;
     profile << "{\n";
     profile << "  \"defaultAction\": \"SCMP_ACT_ALLOW\",\n";
     profile << "  \"architectures\": [\"SCMP_ARCH_X86_64\", \"SCMP_ARCH_X86\", \"SCMP_ARCH_X32\"],\n";
+
+    // Add comment about enforcement mode
+    profile << "  \"comment\": \"DeepKernel generated policy - mode=" << enforcementMode_ << " (connect>=1024)\",\n";
+
     profile << "  \"syscalls\": [\n";
 
-    // Extract syscalls from spec
-    // Look for syscall names in the spec
-    std::regex syscallPattern("\"name\"\\s*:\\s*\"([^\"]+)\"");
-    std::regex actionPattern("\"action\"\\s*:\\s*\"([^\"]+)\"");
-    
-    std::smatch match;
-    std::string remaining = specJson;
-    bool first = true;
+    // Determine action based on enforcement mode
+    std::string effectiveAction = (enforcementMode_ == "LOG") ? "SCMP_ACT_LOG" : "SCMP_ACT_ERRNO";
 
-    while (std::regex_search(remaining, match, syscallPattern)) {
-        std::string syscallName = match[1].str();
-        
-        // Find corresponding action
-        std::string action = "SCMP_ACT_ERRNO";
-        std::smatch actionMatch;
-        if (std::regex_search(remaining, actionMatch, actionPattern)) {
-            action = actionMatch[1].str();
-        }
-
-        if (!first) {
-            profile << ",\n";
-        }
-        first = false;
-
-        profile << "    {\n";
-        profile << "      \"names\": [\"" << syscallName << "\"],\n";
-        profile << "      \"action\": \"" << action << "\"\n";
-        profile << "    }";
-
-        remaining = match.suffix().str();
-    }
-
-    // If no syscalls found in spec, create a default restrictive profile for demo
-    if (first) {
-        // Default: deny connect to high ports (simulated by denying connect entirely for demo)
-        profile << "    {\n";
-        profile << "      \"names\": [\"connect\"],\n";
-        profile << "      \"action\": \"SCMP_ACT_ERRNO\",\n";
-        profile << "      \"args\": []\n";
-        profile << "    }";
-    }
+    // Default: connect with port >= 1024
+    profile << "    {\n";
+    profile << "      \"names\": [\"connect\"],\n";
+    profile << "      \"action\": \"" << effectiveAction << "\",\n";
+    profile << "      \"args\": [\n";
+    profile << "        {\"index\": 1, \"op\": \"SCMP_CMP_GE\", \"value\": 1024}\n";
+    profile << "      ],\n";
+    profile << "      \"comment\": \"Deny/log connect to high ports (>=1024); adjust as needed\"\n";
+    profile << "    }\n";
 
     profile << "\n  ]\n";
     profile << "}\n";

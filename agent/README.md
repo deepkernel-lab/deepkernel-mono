@@ -83,6 +83,7 @@ sudo ./deepkernel-agent
 | `DK_AGENT_LISTEN_PORT` | `8081` | HTTP server port for commands |
 | `DK_CONTAINER_FILTER` | `` | Regex to filter containers (empty=all) |
 | `DK_POLICY_DIR` | `/var/lib/deepkernel/policies` | Directory for policy files |
+| `DK_POLICY_ENFORCEMENT_MODE` | `ERRNO` | Policy action: `ERRNO` (block) or `LOG` (audit only) |
 
 ### Example: Demo Configuration
 
@@ -92,9 +93,24 @@ export DK_SERVER_URL="http://localhost:8080"
 export DK_CONTAINER_FILTER="bachat"
 export DK_DUMP_DIR="./dumps"
 export DK_POLICY_DIR="./policies"
+export DK_POLICY_ENFORCEMENT_MODE="ERRNO"  # or "LOG" for dry-run
 
 sudo -E ./deepkernel-agent
 ```
+
+### Enforcement Modes
+
+**ERRNO Mode (Default)** - Active blocking
+- Syscalls are denied with `EPERM` error
+- Container sees "Operation not permitted"
+- Demonstrates actual threat mitigation
+- **Risk:** May break legitimate traffic if policy is too broad
+
+**LOG Mode** - Audit only
+- Syscalls are logged to audit subsystem
+- Container behavior unchanged
+- Safe for testing without disruption
+- Check logs: `sudo ausearch -m SECCOMP`
 
 ## Docker Permissions
 
@@ -260,6 +276,53 @@ For the Bachat Bank demo:
    - Detect containers matching "bachat" pattern
    - Send 5-second windows to server
    - Accept policy enforcement commands
+
+## Policy Enforcement Limitations & Workarounds
+
+### Seccomp Port Filtering Challenge
+
+**Problem:** Seccomp cannot directly filter by destination port because:
+- Seccomp inspects syscall arguments (register values)
+- Port is inside `sockaddr*` structure (requires memory dereference)
+- Seccomp lacks memory access capabilities
+
+**Current Behavior:**
+When the server sends a policy to "deny high ports", the agent generates a Seccomp profile that blocks **ALL** `connect` syscalls (not just high ports).
+
+**Workarounds for Demo:**
+
+1. **Use LOG mode** - Profile is applied but only audits, doesn't block:
+   ```bash
+   export DK_POLICY_ENFORCEMENT_MODE="LOG"
+   ```
+   Then demonstrate by showing audit logs: `sudo ausearch -m SECCOMP`
+
+2. **Scope threats carefully** - Have the server send specific syscall names:
+   - For file threats: `openat`, `unlink` (more targetable)
+   - For process threats: `execve`, `ptrace`
+   - For network: Accept that `connect` blocks all, or use LOG mode
+
+3. **Use alternative enforcement** (production approach):
+   - **eBPF LSM hooks** - Can inspect full sockaddr structure
+   - **Network policies** - Use iptables/nftables for IP/port filtering
+   - **Container restart** with allow-list - Restart with limited connect permissions
+
+### Demo Recommendation
+
+**For THREAT scenario (malicious beacon to external high port):**
+```bash
+# Option A: Block mode (demonstrates enforcement)
+export DK_POLICY_ENFORCEMENT_MODE="ERRNO"
+# Shows: Container gets EPERM on connect, attack blocked
+# Risk: May also block legitimate connections
+
+# Option B: Audit mode (safer)
+export DK_POLICY_ENFORCEMENT_MODE="LOG"  
+# Shows: Policy generated, audit logs capture attempts
+# Benefit: No disruption, still demonstrates detection
+```
+
+**For production:** Use eBPF LSM or network policies for port-specific filtering.
 
 ## License
 

@@ -7,10 +7,12 @@
 #include <ctime>
 #include <filesystem>
 #include <iostream>
+#include <regex>
 #include <sstream>
 
 #include <bpf/bpf.h>
 
+#include "policy_enforcer.h"
 #include "serialization.h"
 
 namespace {
@@ -51,9 +53,15 @@ std::string sanitizeContainerId(const std::string& id) {
 
 Agent::Agent(AgentConfig config)
     : config_(std::move(config)),
-      dockerMapper_(config_.dockerSocketPath, config_.containerMapCacheTTL) {}
+      dockerMapper_(config_.dockerSocketPath, config_.containerMapCacheTTL),
+      policyEnforcer_(std::make_unique<PolicyEnforcer>(config_.dockerSocketPath, config_.policyDir, config_.policyEnforcementMode)) {}
 
-Agent::~Agent() { cleanupBpf(); }
+Agent::~Agent() {
+    if (server_) {
+        server_->stop();
+    }
+    cleanupBpf();
+}
 
 bool Agent::initBpf() {
     bpf_object* obj = bpf_object__open_file(kBpfObjFile, nullptr);
@@ -104,6 +112,40 @@ void Agent::cleanupBpf() {
     bpf_obj_.reset();
 }
 
+void Agent::initServer() {
+    server_ = std::make_unique<AgentServer>(config_.agentListenPort);
+
+    // Set up long dump request handler
+    server_->setLongDumpHandler([this](const std::string& containerId, int durationSec, const std::string& reason) {
+        std::cout << "Received long dump request for " << containerId 
+                  << " duration=" << durationSec << "s reason=" << reason << "\n";
+        requestLongDump(containerId, durationSec);
+    });
+
+    // Set up policy handler
+    server_->setPolicyHandler([this](const std::string& containerId, const std::string& policyId,
+                                     const std::string& policyType, const std::string& specJson) {
+        return handlePolicy(containerId, policyId, policyType, specJson);
+    });
+
+    if (!server_->start()) {
+        std::cerr << "Warning: Failed to start agent HTTP server on port " << config_.agentListenPort << "\n";
+    }
+}
+
+bool Agent::handlePolicy(const std::string& containerId, const std::string& policyId,
+                         const std::string& policyType, const std::string& specJson) {
+    std::cout << "Received policy " << policyId << " type=" << policyType 
+              << " for container " << containerId << "\n";
+
+    if (policyEnforcer_) {
+        return policyEnforcer_->apply(containerId, policyId, policyType, specJson);
+    }
+
+    std::cerr << "PolicyEnforcer not initialized\n";
+    return false;
+}
+
 int Agent::handleEventThunk(void* ctx, void* data, size_t len) {
     if (len < sizeof(KernelSyscallEvent)) {
         return 0;
@@ -124,6 +166,25 @@ int Agent::handleEvent(const KernelSyscallEvent& evt) {
     };
 
     std::string containerId = mapContainerId(mapped.cgroupId, mapped.pid);
+
+    // Apply container filter if configured
+    if (!config_.containerFilterRegex.empty()) {
+        try {
+            std::regex filterRegex(config_.containerFilterRegex);
+            if (!std::regex_search(containerId, filterRegex)) {
+                // Skip containers that don't match the filter
+                return 0;
+            }
+        } catch (const std::regex_error& e) {
+            // Invalid regex - log once and skip filtering
+            static bool warned = false;
+            if (!warned) {
+                std::cerr << "Warning: Invalid container filter regex: " << e.what() << "\n";
+                warned = true;
+            }
+        }
+    }
+
     auto& buffer = buffers_[containerId];
     buffer.containerId = containerId;
 
@@ -142,6 +203,7 @@ int Agent::handleEvent(const KernelSyscallEvent& evt) {
     }
 
     stopExpiredLongDumps(mapped.tsNs);
+    cleanupInactiveBuffers(mapped.tsNs);
     return 0;
 }
 
@@ -170,8 +232,8 @@ void Agent::processShortWindow(ContainerBuffer& buffer) {
 
     std::string url = config_.serverUrl + "/api/v1/agent/windows";
     std::string payload = buildWindowJson(config_.agentId, buffer.containerId, buffer.windowStartTsNs, buffer.currentShortWindow);
-    if (!http_.postJson(url, payload)) {
-        std::cerr << "Failed to POST window for container " << buffer.containerId << "\n";
+    if (!http_.postJsonWithRetry(url, payload, 3, 5)) {
+        std::cerr << "Failed to POST window for container " << buffer.containerId << " after retries\n";
     }
 
     // Reset window
@@ -253,8 +315,8 @@ void Agent::notifyDumpComplete(ContainerBuffer& buffer) {
     std::cout << "Long dump completed for " << buffer.containerId 
               << " with " << buffer.longDumpRecordCount << " records\n";
 
-    if (!http_.postJson(url, payload)) {
-        std::cerr << "Failed to notify server of dump completion for " << buffer.containerId << "\n";
+    if (!http_.postJsonWithRetry(url, payload, 3, 5)) {
+        std::cerr << "Failed to notify server of dump completion for " << buffer.containerId << " after retries\n";
     }
 
     // Reset dump state
@@ -263,15 +325,54 @@ void Agent::notifyDumpComplete(ContainerBuffer& buffer) {
     buffer.longDumpDurationSec = 0;
 }
 
+void Agent::cleanupInactiveBuffers(uint64_t nowNs) {
+    // Run cleanup at most once per minute
+    constexpr uint64_t kCleanupIntervalNs = 60ULL * 1'000'000'000ULL;  // 60 seconds
+    if (nowNs - lastBufferCleanupNs_ < kCleanupIntervalNs) {
+        return;
+    }
+    lastBufferCleanupNs_ = nowNs;
+
+    // Remove buffers inactive for more than 5 minutes
+    constexpr uint64_t kInactiveThresholdNs = 300ULL * 1'000'000'000ULL;  // 5 minutes
+
+    size_t removedCount = 0;
+    for (auto it = buffers_.begin(); it != buffers_.end();) {
+        const auto& buf = it->second;
+        bool isInactive = (nowNs - buf.lastEventTsNs) > kInactiveThresholdNs;
+        bool hasNoDump = !buf.isLongDumpActive;
+        bool hasNoWindow = buf.currentShortWindow.empty();
+
+        if (isInactive && hasNoDump && hasNoWindow) {
+            it = buffers_.erase(it);
+            ++removedCount;
+        } else {
+            ++it;
+        }
+    }
+
+    if (removedCount > 0) {
+        std::cout << "Cleaned up " << removedCount << " inactive container buffers\n";
+    }
+}
+
 int Agent::run() {
     if (!initBpf()) {
         return 1;
     }
 
+    // Start HTTP server for receiving commands from DeepKernel server
+    initServer();
+
     std::signal(SIGINT, handleSignal);
     std::signal(SIGTERM, handleSignal);
 
-    std::cout << "DeepKernel agent started. Posting windows to " << config_.serverUrl << "\n";
+    std::cout << "DeepKernel agent started.\n";
+    std::cout << "  - Posting windows to " << config_.serverUrl << "\n";
+    std::cout << "  - Listening for commands on port " << config_.agentListenPort << "\n";
+    if (!config_.containerFilterRegex.empty()) {
+        std::cout << "  - Container filter: " << config_.containerFilterRegex << "\n";
+    }
 
     // Optional: start baseline long dump for all observed containers (off by default).
     if (config_.autoBaselineDump) {
@@ -290,6 +391,9 @@ int Agent::run() {
         }
     }
 
+    if (server_) {
+        server_->stop();
+    }
     cleanupBpf();
     return 0;
 }

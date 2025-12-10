@@ -71,8 +71,20 @@ std::string DockerMapper::getContainerName(uint64_t cgroupId, uint32_t pid) {
         return "";
     }
 
+    // Debug logging for demo troubleshooting
+    static bool firstMapping = true;
+    if (firstMapping) {
+        std::cout << "DockerMapper: Found container hash " << containerHash << " from cgroup " << cgroupId << "\n";
+        firstMapping = false;
+    }
+
     // Query Docker API for container name
     std::string containerName = queryDockerForName(containerHash);
+
+    // Log successful mapping for demo visibility
+    if (!containerName.empty() && containerName != containerHash) {
+        std::cout << "DockerMapper: Resolved cgroup " << cgroupId << " → " << containerName << "\n";
+    }
 
     // Cache the result
     {
@@ -97,23 +109,39 @@ std::string DockerMapper::extractContainerHashFromCgroup(uint32_t pid) {
 
     std::string line;
     while (std::getline(file, line)) {
-        // Docker cgroup patterns:
+        // Docker cgroup patterns (multiple patterns for compatibility):
         // cgroup v1: 0::/docker/<64-char-hash>
         // cgroup v2: 0::/system.slice/docker-<64-char-hash>.scope
-        // Also handle: /docker/<hash>/... or /kubepods/.../<hash>
+        // Docker Compose: /docker/<hash>/docker-compose-<service>
+        // Kubernetes: /kubepods/besteffort/pod<uid>/<hash>
+        // Containerd: /system.slice/cri-containerd-<hash>.scope
         
-        // Pattern 1: docker/<hash>
-        std::regex dockerPattern("docker[/-]([a-f0-9]{12,64})");
         std::smatch match;
+
+        // Pattern 1: docker/<hash> or docker-<hash>
+        std::regex dockerPattern("docker[/-]([a-f0-9]{12,64})");
         if (std::regex_search(line, match, dockerPattern) && match.size() > 1) {
             std::string hash = match[1].str();
-            // Return first 12 characters (short hash) or full hash
             return hash.length() > 12 ? hash.substr(0, 12) : hash;
         }
 
         // Pattern 2: containerd (cri-containerd-<hash>.scope)
         std::regex containerdPattern("cri-containerd-([a-f0-9]{12,64})");
         if (std::regex_search(line, match, containerdPattern) && match.size() > 1) {
+            std::string hash = match[1].str();
+            return hash.length() > 12 ? hash.substr(0, 12) : hash;
+        }
+
+        // Pattern 3: Kubernetes pods (kubepods/.../hash)
+        std::regex kubePattern("kubepods.*?([a-f0-9]{64})");
+        if (std::regex_search(line, match, kubePattern) && match.size() > 1) {
+            std::string hash = match[1].str();
+            return hash.substr(0, 12);  // Use short hash
+        }
+
+        // Pattern 4: Podman (libpod-<hash>.scope)
+        std::regex podmanPattern("libpod-([a-f0-9]{12,64})");
+        if (std::regex_search(line, match, podmanPattern) && match.size() > 1) {
             std::string hash = match[1].str();
             return hash.length() > 12 ? hash.substr(0, 12) : hash;
         }
@@ -132,6 +160,12 @@ std::string DockerMapper::queryDockerForName(const std::string& containerHash) {
     std::string response = httpGetUnixSocket(dockerSocketPath_, path);
 
     if (response.empty()) {
+        static bool warnedOnce = false;
+        if (!warnedOnce) {
+            std::cerr << "DockerMapper: Could not query Docker API for " << containerHash 
+                      << " (is Docker socket accessible?)\n";
+            warnedOnce = true;
+        }
         return containerHash;  // Return hash as fallback
     }
 
@@ -148,6 +182,15 @@ std::string DockerMapper::queryDockerForName(const std::string& containerHash) {
         std::string serviceLabel = extractJsonStringField(response, "com.docker.compose.service");
         if (!serviceLabel.empty()) {
             name = serviceLabel;
+        }
+    }
+
+    // Final fallback: try docker-compose project + service
+    if (name.empty()) {
+        std::string project = extractJsonStringField(response, "com.docker.compose.project");
+        std::string service = extractJsonStringField(response, "com.docker.compose.service");
+        if (!project.empty() && !service.empty()) {
+            name = project + "-" + service;
         }
     }
 
