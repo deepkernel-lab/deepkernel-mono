@@ -27,8 +27,11 @@ add_custom_target(bpf_obj ALL DEPENDS ${BPF_OBJ})
 add_executable(deepkernel-agent
     src/main.cpp
     src/agent.cpp
+    src/agent_server.cpp
     src/config.cpp
+    src/docker_mapper.cpp
     src/http_client.cpp
+    src/policy_enforcer.cpp
     src/serialization.cpp
 )
 
@@ -67,10 +70,15 @@ enable_testing()
 
 add_executable(agent-tests
     src/serialization.cpp
+    src/docker_mapper.cpp
+    src/policy_enforcer.cpp
+    src/http_client.cpp
     tests/serialization_tests.cpp
+    tests/docker_mapper_tests.cpp
+    tests/policy_enforcer_tests.cpp
 )
 target_include_directories(agent-tests PRIVATE include ${LIBBPF_INCLUDE_DIRS})
-target_link_libraries(agent-tests PRIVATE GTest::gtest_main)
+target_link_libraries(agent-tests PRIVATE GTest::gtest_main CURL::libcurl)
 
 include(GoogleTest)
 gtest_discover_tests(agent-tests)

@@ -18,6 +18,9 @@ struct ContainerBuffer {
     uint64_t longDumpEndTsNs{0};
     uint64_t lastDumpTsNs{0};
     std::ofstream longDumpStream;
+    std::string longDumpFilePath;       // Full path to dump file
+    uint64_t longDumpRecordCount{0};    // Number of records written
+    int longDumpDurationSec{0};         // Requested duration
 };
 
 // Buffer management helpers implemented in agent.cpp.

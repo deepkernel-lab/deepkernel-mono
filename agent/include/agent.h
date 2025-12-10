@@ -9,6 +9,7 @@
 
 #include "buffer_manager.h"
 #include "config.h"
+#include "docker_mapper.h"
 #include "event_types.h"
 #include "http_client.h"
 
@@ -23,6 +24,7 @@ public:
 private:
     AgentConfig config_;
     HttpClient http_;
+    DockerMapper dockerMapper_;
     int bpf_fd_{-1};
     std::unique_ptr<ring_buffer, decltype(&ring_buffer__free)> ringbuf_{nullptr, &ring_buffer__free};
     std::unique_ptr<bpf_link, decltype(&bpf_link__destroy)> tp_link_{nullptr, &bpf_link__destroy};
@@ -34,9 +36,10 @@ private:
     void cleanupBpf();
     static int handleEventThunk(void* ctx, void* data, size_t len);
     int handleEvent(const KernelSyscallEvent& evt);
-    std::string mapContainerId(uint64_t cgroupId) const;
+    std::string mapContainerId(uint64_t cgroupId, uint32_t pid);
     void processShortWindow(ContainerBuffer& buffer);
     void appendLongDump(ContainerBuffer& buffer, const SyscallEvent& evt);
     void stopExpiredLongDumps(uint64_t nowNs);
+    void notifyDumpComplete(ContainerBuffer& buffer);
 };
 

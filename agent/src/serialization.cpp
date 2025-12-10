@@ -46,3 +46,21 @@ std::string buildWindowJson(const std::string& agentId,
     return oss.str();
 }
 
+std::string buildDumpCompleteJson(const std::string& agentId,
+                                  const std::string& containerId,
+                                  const std::string& dumpPath,
+                                  uint64_t startTsNs,
+                                  int durationSec,
+                                  uint64_t recordCount) {
+    std::ostringstream oss;
+    oss << "{";
+    oss << "\"agent_id\":\"" << agentId << "\",";
+    oss << "\"container_id\":\"" << containerId << "\",";
+    oss << "\"dump_path\":\"" << dumpPath << "\",";
+    oss << "\"start_ts_ns\":" << startTsNs << ",";
+    oss << "\"duration_sec\":" << durationSec << ",";
+    oss << "\"record_count\":" << recordCount;
+    oss << "}";
+    return oss.str();
+}
+

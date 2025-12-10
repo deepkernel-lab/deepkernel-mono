@@ -49,7 +49,9 @@ std::string sanitizeContainerId(const std::string& id) {
 }
 }  // namespace
 
-Agent::Agent(AgentConfig config) : config_(std::move(config)) {}
+Agent::Agent(AgentConfig config)
+    : config_(std::move(config)),
+      dockerMapper_(config_.dockerSocketPath, config_.containerMapCacheTTL) {}
 
 Agent::~Agent() { cleanupBpf(); }
 
@@ -121,7 +123,7 @@ int Agent::handleEvent(const KernelSyscallEvent& evt) {
         .argBucket = evt.arg_bucket,
     };
 
-    std::string containerId = mapContainerId(mapped.cgroupId);
+    std::string containerId = mapContainerId(mapped.cgroupId, mapped.pid);
     auto& buffer = buffers_[containerId];
     buffer.containerId = containerId;
 
@@ -150,6 +152,7 @@ void Agent::appendLongDump(ContainerBuffer& buffer, const SyscallEvent& evt) {
     if (evt.tsNs >= buffer.longDumpEndTsNs) {
         buffer.longDumpStream.close();
         buffer.isLongDumpActive = false;
+        notifyDumpComplete(buffer);
         return;
     }
 
@@ -157,6 +160,7 @@ void Agent::appendLongDump(ContainerBuffer& buffer, const SyscallEvent& evt) {
     TraceRecord rec = makeTraceRecord(evt, prev);
     buffer.longDumpStream.write(reinterpret_cast<const char*>(&rec), sizeof(rec));
     buffer.lastDumpTsNs = evt.tsNs;
+    buffer.longDumpRecordCount++;
 }
 
 void Agent::processShortWindow(ContainerBuffer& buffer) {
@@ -175,10 +179,17 @@ void Agent::processShortWindow(ContainerBuffer& buffer) {
     buffer.windowStartTsNs = 0;
 }
 
-std::string Agent::mapContainerId(uint64_t cgroupId) const {
-    // Placeholder mapping: use cgroup_id string. This should be replaced with
-    // a lookup against cgroup/container metadata for real deployments.
-    return std::to_string(cgroupId);
+std::string Agent::mapContainerId(uint64_t cgroupId, uint32_t pid) {
+    // Try to resolve Docker container name from cgroup ID
+    std::string containerName = dockerMapper_.getContainerName(cgroupId, pid);
+    
+    // If Docker mapping found a name, use it; otherwise fall back to cgroup ID
+    if (!containerName.empty()) {
+        return containerName;
+    }
+    
+    // Fall back to cgroup_id string for non-container processes
+    return "host-" + std::to_string(cgroupId);
 }
 
 void Agent::requestLongDump(const std::string& containerId, int durationSec) {
@@ -202,6 +213,11 @@ void Agent::requestLongDump(const std::string& containerId, int durationSec) {
         buffer.longDumpStartTsNs + static_cast<uint64_t>(durationSec) * 1'000'000'000ULL;
     buffer.lastDumpTsNs = 0;
     buffer.isLongDumpActive = true;
+    buffer.longDumpFilePath = filePath.string();
+    buffer.longDumpRecordCount = 0;
+    buffer.longDumpDurationSec = durationSec;
+
+    std::cout << "Starting long dump for " << containerId << " to " << buffer.longDumpFilePath << "\n";
 
     TraceHeader header{};
     header.version = kTraceVersion;
@@ -218,8 +234,33 @@ void Agent::stopExpiredLongDumps(uint64_t nowNs) {
                 buf.longDumpStream.close();
             }
             buf.isLongDumpActive = false;
+            notifyDumpComplete(buf);
         }
     }
+}
+
+void Agent::notifyDumpComplete(ContainerBuffer& buffer) {
+    std::string url = config_.serverUrl + "/api/v1/agent/long-dump-complete";
+    std::string payload = buildDumpCompleteJson(
+        config_.agentId,
+        buffer.containerId,
+        buffer.longDumpFilePath,
+        buffer.longDumpStartTsNs,
+        buffer.longDumpDurationSec,
+        buffer.longDumpRecordCount
+    );
+
+    std::cout << "Long dump completed for " << buffer.containerId 
+              << " with " << buffer.longDumpRecordCount << " records\n";
+
+    if (!http_.postJson(url, payload)) {
+        std::cerr << "Failed to notify server of dump completion for " << buffer.containerId << "\n";
+    }
+
+    // Reset dump state
+    buffer.longDumpFilePath.clear();
+    buffer.longDumpRecordCount = 0;
+    buffer.longDumpDurationSec = 0;
 }
 
 int Agent::run() {
