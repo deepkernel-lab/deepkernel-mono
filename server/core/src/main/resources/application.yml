@@ -18,4 +18,10 @@ deepkernel:
   gemini:
     api-key: ${GEMINI_API_KEY:}
     model: gemini-pro
+  # Anomaly detection configuration
+  # mode: LOCAL (in-process only), REMOTE (ml-service only), HYBRID (prefer remote, fallback to local)
+  anomaly:
+    mode: ${ANOMALY_ENGINE_MODE:HYBRID}
+  ml-service:
+    url: ${ML_SERVICE_URL:http://localhost:8081}
 

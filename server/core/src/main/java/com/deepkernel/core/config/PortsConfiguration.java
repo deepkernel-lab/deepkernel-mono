@@ -1,6 +1,8 @@
 package com.deepkernel.core.config;
 
+import com.deepkernel.anomaly.engine.HybridAnomalyAdapter;
 import com.deepkernel.anomaly.engine.InProcessIsolationForestAdapter;
+import com.deepkernel.anomaly.engine.RemoteMlAdapter;
 import com.deepkernel.cicd.GitHubChangeContextAdapter;
 import com.deepkernel.core.adapters.agent.HttpAgentAdapter;
 import com.deepkernel.core.ports.AgentControlPort;
@@ -10,13 +12,27 @@ import com.deepkernel.core.ports.PolicyGeneratorPort;
 import com.deepkernel.core.ports.TriagePort;
 import com.deepkernel.policy.DefaultPolicyGenerator;
 import com.deepkernel.triage.GeminiTriageAdapter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * Configuration for ports and adapters.
+ * 
+ * Anomaly Detection Modes:
+ * - LOCAL: Uses InProcessIsolationForestAdapter (heuristic-based, always available)
+ * - REMOTE: Uses RemoteMlAdapter (calls ml-service, requires running Python service)
+ * - HYBRID: Uses HybridAnomalyAdapter (tries remote first, falls back to local)
+ * 
+ * Set ANOMALY_ENGINE_MODE or deepkernel.anomaly.mode to configure.
+ */
 @Configuration
 public class PortsConfiguration {
+    
+    private static final Logger log = LoggerFactory.getLogger(PortsConfiguration.class);
 
     @Value("${deepkernel.agent.base-url:http://localhost:7070}")
     private String agentBaseUrl;
@@ -26,6 +42,12 @@ public class PortsConfiguration {
     
     @Value("${deepkernel.gemini.model:gemini-pro}")
     private String geminiModel;
+    
+    @Value("${deepkernel.anomaly.mode:HYBRID}")
+    private String anomalyMode;
+    
+    @Value("${deepkernel.ml-service.url:http://localhost:8081}")
+    private String mlServiceUrl;
 
     @Bean
     public RestTemplate restTemplate() {
@@ -33,8 +55,36 @@ public class PortsConfiguration {
     }
 
     @Bean
-    public AnomalyDetectionPort anomalyDetectionPort() {
-        return new InProcessIsolationForestAdapter();
+    public AnomalyDetectionPort anomalyDetectionPort(RestTemplate restTemplate) {
+        // Get mode from environment variable or config
+        String mode = System.getenv("ANOMALY_ENGINE_MODE");
+        if (mode == null || mode.isBlank()) {
+            mode = anomalyMode;
+        }
+        mode = mode.toUpperCase();
+        
+        log.info("Configuring anomaly detection with mode: {}", mode);
+        
+        // Create local adapter (always needed as fallback)
+        InProcessIsolationForestAdapter localAdapter = new InProcessIsolationForestAdapter();
+        
+        switch (mode) {
+            case "LOCAL":
+                log.info("Using LOCAL anomaly detection (InProcessIsolationForestAdapter)");
+                return localAdapter;
+                
+            case "REMOTE":
+                log.info("Using REMOTE anomaly detection (RemoteMlAdapter at {})", mlServiceUrl);
+                RemoteMlAdapter remoteAdapter = new RemoteMlAdapter(restTemplate, mlServiceUrl);
+                // Wrap in hybrid with local fallback for safety
+                return new HybridAnomalyAdapter(remoteAdapter, localAdapter, true);
+                
+            case "HYBRID":
+            default:
+                log.info("Using HYBRID anomaly detection (remote={}, local fallback)", mlServiceUrl);
+                RemoteMlAdapter remote = new RemoteMlAdapter(restTemplate, mlServiceUrl);
+                return new HybridAnomalyAdapter(remote, localAdapter, true);
+        }
     }
 
     @Bean
@@ -57,4 +107,3 @@ public class PortsConfiguration {
         return new HttpAgentAdapter(restTemplate, agentBaseUrl);
     }
 }
-

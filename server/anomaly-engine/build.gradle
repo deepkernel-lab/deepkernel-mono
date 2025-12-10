@@ -8,5 +8,11 @@ dependencies {
     
     // SLF4J for logging
     implementation 'org.slf4j:slf4j-api:2.0.9'
+    
+    // Spring Web for RestTemplate
+    implementation 'org.springframework:spring-web:6.1.2'
+    
+    // Jackson for JSON parsing
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.3'
 }
 
