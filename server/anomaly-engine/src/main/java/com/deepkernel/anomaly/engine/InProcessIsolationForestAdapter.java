@@ -9,19 +9,26 @@ import com.deepkernel.core.ports.AnomalyDetectionPort;
 import java.util.List;
 
 public class InProcessIsolationForestAdapter implements AnomalyDetectionPort {
+    private final Map<String, ModelMeta> models = new HashMap<>();
+
     @Override
     public AnomalyScore scoreWindow(String containerId, FeatureVector featureVector) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        // Placeholder scoring: deterministic pseudo-score based on size.
+        double score = featureVector.values() == null ? 0.0 : -(featureVector.values().size() % 10) / 10.0;
+        boolean anomalous = score < -0.7;
+        return new AnomalyScore(score, anomalous);
     }
 
     @Override
     public void trainModel(String containerId, List<FeatureVector> trainingData, TrainingContext context) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        int version = models.getOrDefault(containerId, new ModelMeta("unset", containerId, 0, "v1", com.deepkernel.contracts.model.enums.ModelStatus.UNTRAINED)).version() + 1;
+        ModelMeta meta = new ModelMeta("model-" + containerId, containerId, version, context != null ? "v1" : "v1", com.deepkernel.contracts.model.enums.ModelStatus.READY);
+        models.put(containerId, meta);
     }
 
     @Override
     public ModelMeta getModelMeta(String containerId) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        return models.get(containerId);
     }
 }
 
