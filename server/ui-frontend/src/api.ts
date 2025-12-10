@@ -2,48 +2,28 @@ import { AnomalyEvent, Container, ModelVersion } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
-async function fetchJson<T>(path: string, fallback: T): Promise<T> {
+async function fetchJson<T>(path: string): Promise<T> {
+  const res = await fetch(API_BASE + path);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return (await res.json()) as T;
+}
+
+export async function getContainers(): Promise<Container[]> {
   try {
-    const res = await fetch(API_BASE + path);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return (await res.json()) as T;
+    return await fetchJson<Container[]>('/api/ui/containers');
   } catch (e) {
-    console.warn(`fetch ${path} failed, using fallback:`, e);
-    return fallback;
+    console.warn('Failed to load containers', e);
+    return [];
   }
 }
 
-export function getContainers(): Promise<Container[]> {
-  return fetchJson<Container[]>('/api/ui/containers', [
-    {
-      id: 'prod/billing-api',
-      namespace: 'prod',
-      node: 'worker-01',
-      status: 'Running',
-      agentConnected: true,
-      modelStatus: 'READY',
-      lastVerdict: 'SAFE',
-      lastScore: -0.4,
-      lastDeploy: '2025-12-09T12:04:00Z',
-    },
-    {
-      id: 'prod/payments-svc',
-      namespace: 'prod',
-      node: 'worker-02',
-      status: 'Running',
-      agentConnected: true,
-      modelStatus: 'READY',
-      lastVerdict: 'THREAT',
-      lastScore: 0.92,
-      lastDeploy: '2025-12-09T12:03:30Z',
-    },
-  ]);
-}
-
-export function getContainerModels(_id: string): Promise<ModelVersion[]> {
-  return fetchJson<ModelVersion[]>(`/api/ui/containers/${_id}/models`, [
-    { version: 1, trainedAt: new Date().toISOString(), featureVersion: 'v1', status: 'READY' },
-  ]);
+export async function getContainerModels(id: string): Promise<ModelVersion[]> {
+  try {
+    return await fetchJson<ModelVersion[]>(`/api/ui/containers/${encodeURIComponent(id)}/models`);
+  } catch (e) {
+    console.warn('Failed to load models', e);
+    return [];
+  }
 }
 
 export function summarizeEvent(evt: AnomalyEvent): string {
@@ -52,4 +32,5 @@ export function summarizeEvent(evt: AnomalyEvent): string {
   }
   return JSON.stringify(evt);
 }
+
 

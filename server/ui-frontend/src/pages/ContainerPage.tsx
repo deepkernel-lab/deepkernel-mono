@@ -20,17 +20,14 @@ export function ContainerPage() {
     }
   }, [id]);
 
-  const chartData = useMemo(
-    () =>
-      (container?.lastScore
-        ? [
-            { ts: 't-3', score: container.lastScore - 0.1 },
-            { ts: 't-2', score: container.lastScore - 0.05 },
-            { ts: 't-1', score: container.lastScore },
-          ]
-        : [{ ts: 't-1', score: -0.2 }]),
-    [container?.lastScore],
-  );
+  const chartData = useMemo(() => {
+    const base = container?.lastScore ?? -0.2;
+    return [
+      { ts: 't-3', score: base - 0.1 },
+      { ts: 't-2', score: base - 0.05 },
+      { ts: 't-1', score: base },
+    ];
+  }, [container?.lastScore]);
 
   if (!container) {
     return <div className="text-slate-300">Loading container...</div>;

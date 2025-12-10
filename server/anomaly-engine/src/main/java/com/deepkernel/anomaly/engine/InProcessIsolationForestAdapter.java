@@ -21,7 +21,8 @@ public class InProcessIsolationForestAdapter implements AnomalyDetectionPort {
 
     @Override
     public void trainModel(String containerId, List<FeatureVector> trainingData, TrainingContext context) {
-        int version = models.getOrDefault(containerId, new ModelMeta("unset", containerId, 0, "v1", com.deepkernel.contracts.model.enums.ModelStatus.UNTRAINED)).version() + 1;
+        int currentVersion = models.getOrDefault(containerId, new ModelMeta("unset", containerId, 0, "v1", com.deepkernel.contracts.model.enums.ModelStatus.UNTRAINED)).version();
+        int version = currentVersion + 1;
         ModelMeta meta = new ModelMeta("model-" + containerId, containerId, version, context != null ? "v1" : "v1", com.deepkernel.contracts.model.enums.ModelStatus.READY);
         models.put(containerId, meta);
     }
