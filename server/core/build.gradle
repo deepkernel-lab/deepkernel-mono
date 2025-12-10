@@ -14,5 +14,8 @@ dependencies {
     implementation project(':triage-service')
     implementation project(':cicd-integration')
     implementation project(':policy-engine')
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.mockito:mockito-core:5.10.0'
 }
 

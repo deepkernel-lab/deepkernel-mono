@@ -11,6 +11,8 @@
 
 #include <bpf/bpf.h>
 
+#include "serialization.h"
+
 namespace {
 constexpr const char* kBpfObjFile = "deepkernel.bpf.o";
 constexpr uint32_t kTraceVersion = 1;
@@ -152,12 +154,7 @@ void Agent::appendLongDump(ContainerBuffer& buffer, const SyscallEvent& evt) {
     }
 
     uint64_t prev = buffer.lastDumpTsNs == 0 ? buffer.longDumpStartTsNs : buffer.lastDumpTsNs;
-    TraceRecord rec{
-        .delta_ts_us = static_cast<uint32_t>(nsToUs(evt.tsNs - prev)),
-        .syscall_id = evt.syscallId,
-        .arg_class = evt.argClass,
-        .arg_bucket = evt.argBucket,
-    };
+    TraceRecord rec = makeTraceRecord(evt, prev);
     buffer.longDumpStream.write(reinterpret_cast<const char*>(&rec), sizeof(rec));
     buffer.lastDumpTsNs = evt.tsNs;
 }
@@ -168,7 +165,7 @@ void Agent::processShortWindow(ContainerBuffer& buffer) {
     }
 
     std::string url = config_.serverUrl + "/api/v1/agent/windows";
-    std::string payload = buildWindowJson(buffer.containerId, buffer);
+    std::string payload = buildWindowJson(config_.agentId, buffer.containerId, buffer.windowStartTsNs, buffer.currentShortWindow);
     if (!http_.postJson(url, payload)) {
         std::cerr << "Failed to POST window for container " << buffer.containerId << "\n";
     }
@@ -176,33 +173,6 @@ void Agent::processShortWindow(ContainerBuffer& buffer) {
     // Reset window
     buffer.currentShortWindow.clear();
     buffer.windowStartTsNs = 0;
-}
-
-std::string Agent::buildWindowJson(const std::string& containerId, const ContainerBuffer& buffer) const {
-    std::ostringstream oss;
-    oss << "{";
-    oss << "\"version\":1,";
-    oss << "\"agent_id\":\"" << config_.agentId << "\",";
-    oss << "\"container_id\":\"" << containerId << "\",";
-    oss << "\"window_start_ts_ns\":" << buffer.windowStartTsNs << ",";
-    oss << "\"records\":[";
-    bool first = true;
-    for (const auto& ev : buffer.currentShortWindow) {
-        if (!first) {
-            oss << ",";
-        }
-        first = false;
-        uint64_t deltaUs = nsToUs(ev.tsNs - buffer.windowStartTsNs);
-        oss << "{"
-            << "\"delta_ts_us\":" << deltaUs << ","
-            << "\"syscall_id\":" << ev.syscallId << ","
-            << "\"arg_class\":" << static_cast<int>(ev.argClass) << ","
-            << "\"arg_bucket\":" << static_cast<int>(ev.argBucket)
-            << "}";
-    }
-    oss << "]";
-    oss << "}";
-    return oss.str();
 }
 
 std::string Agent::mapContainerId(uint64_t cgroupId) const {

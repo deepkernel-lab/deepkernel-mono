@@ -29,6 +29,7 @@ add_executable(deepkernel-agent
     src/agent.cpp
     src/config.cpp
     src/http_client.cpp
+    src/serialization.cpp
 )
 
 add_dependencies(deepkernel-agent bpf_obj)
@@ -50,4 +51,27 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy ${BPF_OBJ} $<TARGET_FILE_DIR:deepkernel-agent>/deepkernel.bpf.o
     COMMENT "Copying eBPF object next to binary"
 )
+
+# ------------------------------
+# Tests
+# ------------------------------
+include(FetchContent)
+FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+enable_testing()
+
+add_executable(agent-tests
+    src/serialization.cpp
+    tests/serialization_tests.cpp
+)
+target_include_directories(agent-tests PRIVATE include ${LIBBPF_INCLUDE_DIRS})
+target_link_libraries(agent-tests PRIVATE GTest::gtest_main)
+
+include(GoogleTest)
+gtest_discover_tests(agent-tests)
 

@@ -36,7 +36,6 @@ private:
     int handleEvent(const KernelSyscallEvent& evt);
     std::string mapContainerId(uint64_t cgroupId) const;
     void processShortWindow(ContainerBuffer& buffer);
-    std::string buildWindowJson(const std::string& containerId, const ContainerBuffer& buffer) const;
     void appendLongDump(ContainerBuffer& buffer, const SyscallEvent& evt);
     void stopExpiredLongDumps(uint64_t nowNs);
 };
