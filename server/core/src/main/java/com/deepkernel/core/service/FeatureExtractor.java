@@ -3,6 +3,7 @@ package com.deepkernel.core.service;
 import com.deepkernel.contracts.model.FeatureVector;
 import com.deepkernel.contracts.model.ShortWindowPayload;
 import com.deepkernel.contracts.model.TraceRecord;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,6 +12,7 @@ import java.util.List;
  * Extracts the 594-dim feature vector described in MASTER_PLAN.md Section 7 from a short window.
  * This implementation is simplified but preserves vector layout: [K*K markov][stats][time][args].
  */
+@Component
 public class FeatureExtractor {
     private static final int K = 24;
     private static final int BUCKETS = 12;
@@ -33,21 +35,21 @@ public class FeatureExtractor {
 
         for (int i = 0; i < total; i++) {
             TraceRecord r = records.get(i);
-            int currId = mapSyscallToAlphabet(r.syscall_id());
-            int bucket = mapBucket(r.arg_class(), r.arg_bucket());
+            int currId = mapSyscallToAlphabet(r.syscallId());
+            int bucket = mapBucket(r.argClass(), r.argBucket());
             bucketCounts[bucket]++;
 
-            if (r.arg_class() == 0) fileOps++;
-            else if (r.arg_class() == 1) netOps++;
-            else if (r.arg_class() == 2) procOps++;
+            if (r.argClass() == 0) fileOps++;
+            else if (r.argClass() == 1) netOps++;
+            else if (r.argClass() == 2) procOps++;
             else otherOps++;
 
-            long ts = payload.windowStartTsNs() + (long) r.delta_ts_us() * 1000L;
+            long ts = payload.windowStartTsNs() + (long) r.deltaTsUs() * 1000L;
             lastTs = ts;
 
             if (i > 0) {
                 TraceRecord prev = records.get(i - 1);
-                int prevId = mapSyscallToAlphabet(prev.syscall_id());
+                int prevId = mapSyscallToAlphabet(prev.syscallId());
                 transitions[prevId][currId] += 1.0;
                 outgoing[prevId] += 1;
             }

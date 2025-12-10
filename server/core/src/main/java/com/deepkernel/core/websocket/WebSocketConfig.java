@@ -11,8 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    @Value("${deepkernel.ws.allowed-origins:http://localhost:*}")
-    private String[] allowedOrigins;
+    @Value("${deepkernel.ws.allowed-origins:http://localhost:5173,http://localhost:3000}")
+    private String allowedOrigins;
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
@@ -22,8 +22,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        String[] origins = allowedOrigins.split(",");
         registry.addEndpoint("/ws/events")
-                .setAllowedOriginPatterns(allowedOrigins)
+                .setAllowedOriginPatterns(origins)
                 .withSockJS()
                 .setHeartbeatTime(25_000);
     }

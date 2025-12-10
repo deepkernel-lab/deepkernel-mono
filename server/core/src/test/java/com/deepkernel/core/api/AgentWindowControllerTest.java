@@ -7,9 +7,11 @@ import com.deepkernel.contracts.model.enums.TriageStatus;
 import com.deepkernel.core.api.dto.AgentWindowResponse;
 import com.deepkernel.core.ports.AgentControlPort;
 import com.deepkernel.core.ports.AnomalyDetectionPort;
+import com.deepkernel.core.ports.ChangeContextPort;
 import com.deepkernel.core.ports.PolicyGeneratorPort;
 import com.deepkernel.core.ports.TriagePort;
 import com.deepkernel.core.repo.AnomalyWindowRepository;
+import com.deepkernel.core.repo.ContainerRepository;
 import com.deepkernel.core.repo.EventRepository;
 import com.deepkernel.core.repo.PolicyRepository;
 import com.deepkernel.core.repo.TriageResultRepository;
@@ -36,10 +38,12 @@ class AgentWindowControllerTest {
     private TriagePort triagePort;
     private PolicyGeneratorPort policyGeneratorPort;
     private AgentControlPort agentControlPort;
+    private ChangeContextPort changeContextPort;
     private AnomalyWindowRepository windowRepository;
     private TriageResultRepository triageResultRepository;
     private PolicyRepository policyRepository;
     private EventRepository eventRepository;
+    private ContainerRepository containerRepository;
     private AgentWindowController controller;
 
     @BeforeEach
@@ -50,10 +54,12 @@ class AgentWindowControllerTest {
         triagePort = mock(TriagePort.class);
         policyGeneratorPort = mock(PolicyGeneratorPort.class);
         agentControlPort = mock(AgentControlPort.class);
+        changeContextPort = mock(ChangeContextPort.class);
         windowRepository = new AnomalyWindowRepository();
         triageResultRepository = new TriageResultRepository();
         policyRepository = new PolicyRepository();
         eventRepository = new EventRepository();
+        containerRepository = new ContainerRepository();
         controller = new AgentWindowController(
                 anomalyDetectionPort,
                 featureExtractor,
@@ -61,10 +67,12 @@ class AgentWindowControllerTest {
                 triagePort,
                 policyGeneratorPort,
                 agentControlPort,
+                changeContextPort,
                 windowRepository,
                 triageResultRepository,
                 policyRepository,
-                eventRepository
+                eventRepository,
+                containerRepository
         );
     }
 
@@ -102,7 +110,7 @@ class AgentWindowControllerTest {
         when(policyGeneratorPort.generatePolicy(any(), eq(triage))).thenReturn(policy);
 
         var response = controller.ingestWindow(payload);
-        assertEquals(202, response.getStatusCodeValue());
+        assertEquals(202, response.getStatusCode().value());
         assertTrue(((AgentWindowResponse) response.getBody()).status().contains("anomalous"));
 
         // Repositories updated
@@ -116,5 +124,87 @@ class AgentWindowControllerTest {
         // Events published
         verify(messagingTemplate, atLeast(2)).convertAndSend(eq("/topic/events"), any(LiveEvent.class));
     }
-}
+    
+    @Test
+    void autoRegistersUnknownContainer() {
+        ShortWindowPayload payload = new ShortWindowPayload(
+                1,
+                "node-1",
+                "prod/new-service",
+                1_000_000L,
+                List.of(new TraceRecord(0, 2, 0, 0))
+        );
 
+        when(anomalyDetectionPort.scoreWindow(anyString(), any()))
+                .thenReturn(new AnomalyScore(-0.3, false));
+        TriageResult triage = new TriageResult(
+                UUID.randomUUID().toString(),
+                "prod/new-service",
+                "win-1",
+                0.2,
+                "SAFE",
+                "Normal behavior",
+                null
+        );
+        when(triagePort.triage(any(), any())).thenReturn(triage);
+        when(policyGeneratorPort.generatePolicy(any(), any())).thenReturn(null);
+
+        controller.ingestWindow(payload);
+
+        // Container should be auto-registered
+        boolean found = containerRepository.findAll().stream()
+                .anyMatch(c -> c.id().equals("prod/new-service"));
+        assertTrue(found, "Container should be auto-registered");
+        
+        // Verify namespace extraction
+        Container container = containerRepository.findAll().stream()
+                .filter(c -> c.id().equals("prod/new-service"))
+                .findFirst()
+                .orElse(null);
+        assertNotNull(container);
+        assertEquals("prod", container.namespace());
+    }
+    
+    @Test
+    void usesChangeContextForTriage() {
+        ShortWindowPayload payload = new ShortWindowPayload(
+                1,
+                "agent-1",
+                "container-1",
+                1_000_000L,
+                List.of(new TraceRecord(0, 59, 2, 1))
+        );
+
+        ChangeContext mockContext = new ChangeContext(
+                "container-1",
+                "abc123",
+                "https://github.com/test/repo",
+                List.of("src/main.py"),
+                "Added new feature",
+                Instant.now()
+        );
+        when(changeContextPort.getChangeContext(anyString(), any())).thenReturn(mockContext);
+        when(anomalyDetectionPort.scoreWindow(anyString(), any()))
+                .thenReturn(new AnomalyScore(-0.5, true));
+        
+        ArgumentCaptor<ChangeContext> contextCaptor = ArgumentCaptor.forClass(ChangeContext.class);
+        TriageResult triage = new TriageResult(
+                UUID.randomUUID().toString(),
+                "container-1",
+                "win-1",
+                0.3,
+                "SAFE",
+                "Explained by recent deployment",
+                null
+        );
+        when(triagePort.triage(any(), contextCaptor.capture())).thenReturn(triage);
+        when(policyGeneratorPort.generatePolicy(any(), any())).thenReturn(null);
+
+        controller.ingestWindow(payload);
+
+        // Verify change context was passed to triage
+        ChangeContext capturedContext = contextCaptor.getValue();
+        assertNotNull(capturedContext);
+        assertEquals("abc123", capturedContext.commitId());
+    }
+}

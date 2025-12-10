@@ -1,7 +1,21 @@
 server:
-  port: 8080
+  port: 9090
+
+spring:
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
 
 deepkernel:
-  # Placeholder configuration; to be fleshed out with datasource, kafka, etc.
-  featureVersion: "v1"
+  feature-version: v1
+  agent:
+    base-url: http://localhost:7070
+  ui:
+    origin: http://localhost:5173
+  ws:
+    allowed-origins: http://localhost:5173,http://localhost:3000
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: gemini-pro
 
