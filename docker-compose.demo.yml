@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server # assume existing or to-be-added
+    environment:
+      - DEEPKERNEL_AGENT_BASE_URL=http://localhost:8080
+      - DEEPKERNEL_WS_ALLOWED_ORIGINS=http://localhost:5173
+    ports:
+      - "8080:8080"
+    depends_on:
+      - ml
+  ml:
+    build:
+      context: ml-service
+      dockerfile: Dockerfile # placeholder if exists
+    ports:
+      - "8081:8081"
+  mock-agent:
+    image: curlimages/curl:8.8.0
+    entrypoint: ["sleep","infinity"]
+
