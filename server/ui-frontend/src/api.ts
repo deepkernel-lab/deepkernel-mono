@@ -26,9 +26,28 @@ export async function getContainerModels(id: string): Promise<ModelVersion[]> {
   }
 }
 
+export async function getEvents(limit = 100) {
+  try {
+    return await fetchJson(`/api/ui/events?limit=${limit}`);
+  } catch (e) {
+    console.warn('Failed to load events', e);
+    return [];
+  }
+}
+
+export async function getContainerEvents(id: string, limit = 100) {
+  try {
+    return await fetchJson(`/api/ui/events/container/${encodeURIComponent(id)}?limit=${limit}`);
+  } catch (e) {
+    console.warn('Failed to load container events', e);
+    return [];
+  }
+}
+
 export function summarizeEvent(evt: AnomalyEvent): string {
   if (evt.type === 'WINDOW_SCORED') {
-    return `${evt.container_id} → score=${evt.ml_score} anomalous=${evt.is_anomalous}`;
+    const cid = (evt as any).containerId || evt.container_id;
+    return `${cid} → score=${evt.ml_score} anomalous=${evt.is_anomalous}`;
   }
   return JSON.stringify(evt);
 }

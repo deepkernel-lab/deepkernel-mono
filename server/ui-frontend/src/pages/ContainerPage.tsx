@@ -43,7 +43,13 @@ export function ContainerPage() {
         <VerdictCard verdict={(container.lastVerdict as any) ?? 'UNKNOWN'} score={container.lastScore} explanation="LLM explanation will appear here." />
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
-        <PolicyCard policyType="SECCOMP" status="PENDING" node={container.node} appliedAt="—" details="deny connect to high ports" />
+        <PolicyCard
+          policyType={container.policyType ?? '—'}
+          status={container.policyStatus ?? '—'}
+          node={container.node}
+          appliedAt="—"
+          details="Latest policy from policy engine"
+        />
         <div className="lg:col-span-2 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
           <div className="text-sm font-semibold text-slate-200 mb-2">Model Versions</div>
           <div className="grid gap-3 sm:grid-cols-2">

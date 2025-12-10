@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.client.RestTemplate;
 
 /**
@@ -18,14 +19,17 @@ public class HttpAgentAdapter implements AgentControlPort {
     private static final Logger log = LoggerFactory.getLogger(HttpAgentAdapter.class);
 
     private final RestTemplate restTemplate;
+    private final String baseUrl;
 
-    public HttpAgentAdapter(RestTemplate restTemplate) {
+    public HttpAgentAdapter(RestTemplate restTemplate,
+                            @Value("${deepkernel.agent.base-url:http://localhost:8080}") String baseUrl) {
         this.restTemplate = restTemplate;
+        this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }
 
     private String baseUrl(String agentId) {
-        // In real deployment this would resolve agent endpoint (service per node).
-        return "http://" + agentId + ":8080";
+        // Same-host demo: use configured base URL; agentId ignored unless templated.
+        return baseUrl.replace("{agentId}", agentId);
     }
 
     @Override

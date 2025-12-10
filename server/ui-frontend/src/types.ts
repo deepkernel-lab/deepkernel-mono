@@ -8,6 +8,8 @@ export type Container = {
   lastVerdict?: 'SAFE' | 'THREAT' | 'UNKNOWN';
   lastScore?: number;
   lastDeploy?: string;
+  policyStatus?: string;
+  policyType?: string;
 };
 
 export type AnomalyEvent = {
