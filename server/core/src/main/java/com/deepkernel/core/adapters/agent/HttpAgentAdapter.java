@@ -12,6 +12,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
@@ -65,7 +66,7 @@ public class HttpAgentAdapter implements AgentControlPort {
 
     @Override
     public void applyPolicy(String agentId, String containerId, Policy policy) {
-        String url = baseUrl + "/policies";
+        String url = baseUrl + "/api/v1/agent/" + agentId + "/containers/" + containerId + "/policies";
         
         Map<String, Object> body = new HashMap<>();
         body.put("container_id", containerId);
@@ -83,8 +84,8 @@ public class HttpAgentAdapter implements AgentControlPort {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-            
-            restTemplate.postForEntity(url, entity, Void.class);
+
+            restTemplate.exchange(url, HttpMethod.POST, entity, Void.class);
             log.info("Applied policy {} ({}) to container {}", policy.id(), policy.type(), containerId);
         } catch (Exception ex) {
             log.warn("Failed to apply policy {} for {}: {}", policy.id(), containerId, ex.getMessage());
