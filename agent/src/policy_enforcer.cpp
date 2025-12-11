@@ -53,11 +53,11 @@ bool PolicyEnforcer::apply(const std::string& containerName, const std::string& 
         // For demo, still mark as applied but log the limitation
         std::cout << "PolicyEnforcer: Would apply " << policyType << " policy (not implemented)\n";
         
-        appliedPolicies_[policyId] = {
-            .containerId = containerName,
-            .policyType = policyType,
-            .profilePath = "",
-            .appliedAtNs = nowNs()
+        appliedPolicies_[policyId] = AppliedPolicy{
+            containerName,
+            policyType,
+            "",
+            nowNs()
         };
         return true;
     }
@@ -83,11 +83,11 @@ bool PolicyEnforcer::apply(const std::string& containerName, const std::string& 
     if (containerId.empty()) {
         std::cerr << "PolicyEnforcer: Could not find container: " << containerName << "\n";
         // Still record the policy for demo purposes
-        appliedPolicies_[policyId] = {
-            .containerId = containerName,
-            .policyType = policyType,
-            .profilePath = profilePath,
-            .appliedAtNs = nowNs()
+        appliedPolicies_[policyId] = AppliedPolicy{
+            containerName,
+            policyType,
+            profilePath,
+            nowNs()
         };
         return true;
     }
@@ -96,11 +96,11 @@ bool PolicyEnforcer::apply(const std::string& containerName, const std::string& 
     bool success = updateContainerSeccomp(containerId, profilePath);
 
     // Record the policy
-    appliedPolicies_[policyId] = {
-        .containerId = containerId,
-        .policyType = policyType,
-        .profilePath = profilePath,
-        .appliedAtNs = nowNs()
+    appliedPolicies_[policyId] = AppliedPolicy{
+        containerId,
+        policyType,
+        profilePath,
+        nowNs()
     };
 
     if (success) {

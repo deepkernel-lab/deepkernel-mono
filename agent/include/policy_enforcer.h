@@ -2,6 +2,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <cstdint>
 
 // Policy enforcement via Docker API.
 // Supports SECCOMP policy application.
