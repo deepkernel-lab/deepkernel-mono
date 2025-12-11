@@ -1,7 +1,7 @@
 // DeepKernel eBPF program: captures sys_enter tracepoint and emits compact
 // syscall events to a ring buffer.
 
-#include <linux/bpf.h>
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 
