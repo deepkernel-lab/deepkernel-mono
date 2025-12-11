@@ -2,7 +2,7 @@
 Isolation Forest model wrapper for anomaly detection.
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -108,7 +108,7 @@ class IsolationForestModel:
         
         # Update metadata
         self.version += 1
-        self.trained_at = datetime.utcnow()
+        self.trained_at = datetime.now(timezone.utc)
         self.sample_count = len(X)
         self.is_fitted = True
         

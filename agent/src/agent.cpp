@@ -74,7 +74,8 @@ bool Agent::initBpf() {
         return false;
     }
 
-    struct bpf_program* prog = bpf_object__find_program_by_title(obj, "tracepoint/syscalls/sys_enter");
+    // struct bpf_program* prog = bpf_object__find_program_by_title(obj, "tracepoint/syscalls/sys_enter");
+    struct bpf_program* prog = bpf_object__find_program_by_name(obj, "handle_sys_enter");
     if (!prog) {
         std::cerr << "Failed to find BPF program\n";
         return false;

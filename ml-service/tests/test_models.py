@@ -6,12 +6,6 @@ from src.main import app
 from src.config import config
 
 
-@pytest.fixture
-def client():
-    """Create test client."""
-    return TestClient(app)
-
-
 def test_get_model_meta_untrained(client):
     """Test getting metadata for untrained model."""
     response = client.get("/api/ml/models/unknown-container")

@@ -29,13 +29,6 @@ struct {
     __uint(max_entries, 256 * 1024);
 } events SEC(".maps");
 
-// Tracepoint args definition (partial) to access syscall id.
-struct trace_event_raw_sys_enter {
-    struct trace_entry ent;
-    long id;
-    unsigned long args[6];
-};
-
 // Classify syscall into FILE, NET, PROC, MEM, or OTHER category.
 // Based on x86_64 syscall numbers from /usr/include/asm/unistd_64.h
 static __always_inline __u8 classify_arg_class(long syscall_id) {

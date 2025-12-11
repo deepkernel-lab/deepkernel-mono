@@ -6,12 +6,6 @@ from src.main import app
 from src.config import config
 
 
-@pytest.fixture
-def client():
-    """Create test client."""
-    return TestClient(app)
-
-
 def test_train_model_success(client):
     """Test successful model training."""
     training_data = [[0.1] * config.feature_vector_dim for _ in range(50)]

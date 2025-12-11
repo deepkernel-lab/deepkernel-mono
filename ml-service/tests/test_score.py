@@ -6,12 +6,6 @@ from src.main import app
 from src.config import config
 
 
-@pytest.fixture
-def client():
-    """Create test client."""
-    return TestClient(app)
-
-
 def test_score_untrained_model(client):
     """Test scoring with untrained model returns neutral score."""
     response = client.post("/api/ml/score", json={
