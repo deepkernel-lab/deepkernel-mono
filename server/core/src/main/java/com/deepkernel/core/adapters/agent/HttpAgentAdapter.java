@@ -3,7 +3,7 @@ package com.deepkernel.core.adapters.agent;
 import com.deepkernel.contracts.model.LongDumpComplete;
 import com.deepkernel.contracts.model.LongDumpRequest;
 import com.deepkernel.contracts.model.Policy;
-import com.deepkernel.core.ports.AgentControlPort;
+import com.deepkernel.contracts.ports.AgentControlPort;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;

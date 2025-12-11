@@ -3,7 +3,7 @@ package com.deepkernel.policy;
 import com.deepkernel.contracts.model.AnomalyWindow;
 import com.deepkernel.contracts.model.Policy;
 import com.deepkernel.contracts.model.TriageResult;
-import com.deepkernel.core.ports.PolicyGeneratorPort;
+import com.deepkernel.contracts.ports.PolicyGeneratorPort;
 import com.deepkernel.contracts.model.enums.PolicyStatus;
 import com.deepkernel.contracts.model.enums.PolicyType;
 

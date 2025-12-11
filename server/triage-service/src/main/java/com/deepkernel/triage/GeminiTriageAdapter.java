@@ -3,7 +3,7 @@ package com.deepkernel.triage;
 import com.deepkernel.contracts.model.AnomalyWindow;
 import com.deepkernel.contracts.model.ChangeContext;
 import com.deepkernel.contracts.model.TriageResult;
-import com.deepkernel.core.ports.TriagePort;
+import com.deepkernel.contracts.ports.TriagePort;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;

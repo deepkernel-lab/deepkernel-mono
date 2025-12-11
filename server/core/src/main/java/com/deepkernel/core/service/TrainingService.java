@@ -2,7 +2,7 @@ package com.deepkernel.core.service;
 
 import com.deepkernel.contracts.model.FeatureVector;
 import com.deepkernel.contracts.model.TrainingContext;
-import com.deepkernel.core.ports.AnomalyDetectionPort;
+import com.deepkernel.contracts.ports.AnomalyDetectionPort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

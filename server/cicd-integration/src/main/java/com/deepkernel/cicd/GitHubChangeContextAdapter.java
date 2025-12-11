@@ -1,7 +1,7 @@
 package com.deepkernel.cicd;
 
 import com.deepkernel.contracts.model.ChangeContext;
-import com.deepkernel.core.ports.ChangeContextPort;
+import com.deepkernel.contracts.ports.ChangeContextPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;

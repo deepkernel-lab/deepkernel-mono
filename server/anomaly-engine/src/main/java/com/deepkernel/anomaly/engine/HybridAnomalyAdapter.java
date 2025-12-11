@@ -4,7 +4,7 @@ import com.deepkernel.contracts.model.AnomalyScore;
 import com.deepkernel.contracts.model.FeatureVector;
 import com.deepkernel.contracts.model.ModelMeta;
 import com.deepkernel.contracts.model.TrainingContext;
-import com.deepkernel.core.ports.AnomalyDetectionPort;
+import com.deepkernel.contracts.ports.AnomalyDetectionPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

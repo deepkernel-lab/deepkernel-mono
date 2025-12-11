@@ -1,4 +1,4 @@
-package com.deepkernel.core.ports;
+package com.deepkernel.contracts.ports;
 
 import com.deepkernel.contracts.model.LongDumpComplete;
 import com.deepkernel.contracts.model.LongDumpRequest;

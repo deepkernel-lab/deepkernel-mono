@@ -1,4 +1,4 @@
-package com.deepkernel.core.ports;
+package com.deepkernel.contracts.ports;
 
 import com.deepkernel.contracts.model.AnomalyScore;
 import com.deepkernel.contracts.model.FeatureVector;

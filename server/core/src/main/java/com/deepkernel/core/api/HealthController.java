@@ -1,6 +1,6 @@
 package com.deepkernel.core.api;
 
-import com.deepkernel.core.ports.AnomalyDetectionPort;
+import com.deepkernel.contracts.ports.AnomalyDetectionPort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
