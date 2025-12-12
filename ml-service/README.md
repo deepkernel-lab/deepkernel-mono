@@ -64,29 +64,44 @@ uvicorn src.main:app --host 0.0.0.0 --port 8081 --workers 4
 | `ISOLATION_FOREST_MAX_SAMPLES` | `256` | Samples per tree |
 | `ANOMALY_THRESHOLD` | `-0.5` | Score threshold for anomaly detection |
 
-## API Endpoints
+## API Reference
 
-### Health Check
+### Health & Status
 
-```
+#### Health Check
+```http
 GET /health
 GET /api/health
 ```
 
-Returns service status.
+Returns service health status and model count.
 
-### Score Window
-
+**Response:**
+```json
+{
+  "status": "ok",
+  "message": "ML service is running",
+  "model_count": 3,
+  "version": "0.1.0"
+}
 ```
+
+---
+
+### ML Operations
+
+#### Score Window
+```http
 POST /api/ml/score
+Content-Type: application/json
 ```
 
-Score a feature vector for anomaly detection.
+Score a feature vector for anomaly detection using the container's Isolation Forest model.
 
 **Request:**
 ```json
 {
-  "container_id": "prod/billing-api",
+  "container_id": "bachat-backend",
   "feature_vector": [0.1, 0.2, ..., 0.0]  // 594 dimensions
 }
 ```
@@ -96,24 +111,35 @@ Score a feature vector for anomaly detection.
 {
   "score": -0.45,
   "anomalous": false,
-  "container_id": "prod/billing-api",
+  "container_id": "bachat-backend",
   "model_version": 1
 }
 ```
 
-### Train Model
+**Status Codes:**
+- `200 OK` - Successfully scored
+- `422 Unprocessable Entity` - Invalid feature vector (wrong dimensions)
+- `503 Service Unavailable` - Service not initialized
 
-```
+---
+
+#### Train Model
+```http
 POST /api/ml/train
+Content-Type: application/json
 ```
 
-Train an Isolation Forest model for a container.
+Train an Isolation Forest model for a specific container.
 
 **Request:**
 ```json
 {
-  "container_id": "prod/billing-api",
-  "training_data": [[...], [...], ...],
+  "container_id": "bachat-backend",
+  "training_data": [
+    [0.1, 0.2, ..., 0.0],  // Feature vector 1 (594 dims)
+    [0.15, 0.18, ..., 0.01],  // Feature vector 2
+    ...
+  ],
   "context": {
     "reason": "baseline_training",
     "min_records_per_window": 20
@@ -121,58 +147,139 @@ Train an Isolation Forest model for a container.
 }
 ```
 
+**Validation:**
+- Minimum 10 training samples required
+- Each feature vector must be exactly 594 dimensions
+
 **Response:**
 ```json
 {
-  "model_id": "model-prod-billing-api",
-  "container_id": "prod/billing-api",
+  "model_id": "model-bachat-backend",
+  "container_id": "bachat-backend",
   "version": 1,
   "status": "READY",
   "trained_at": "2025-12-10T20:00:00Z",
-  "sample_count": 1500
+  "sample_count": 150
 }
 ```
 
-### Get Model Metadata
+**Status Codes:**
+- `200 OK` - Training successful
+- `422 Unprocessable Entity` - Invalid training data
+- `500 Internal Server Error` - Training failed
 
-```
+---
+
+### Model Management
+
+#### Get Model Metadata
+```http
 GET /api/ml/models/{container_id}
 ```
 
 Get metadata for a container's model.
 
-**Response:**
+**Example:**
+```bash
+curl http://localhost:8081/api/ml/models/bachat-backend
+```
+
+**Response (Trained):**
 ```json
 {
-  "model_id": "model-prod-billing-api",
-  "container_id": "prod/billing-api",
+  "model_id": "model-bachat-backend",
+  "container_id": "bachat-backend",
   "version": 2,
   "feature_version": "v1",
   "status": "READY",
   "trained_at": "2025-12-10T20:00:00Z",
-  "sample_count": 1500,
+  "sample_count": 150,
   "parameters": {
     "n_estimators": 100,
-    "contamination": 0.1
+    "contamination": 0.1,
+    "max_samples": 256,
+    "random_state": 42
   }
 }
 ```
 
-### List Models
-
+**Response (Untrained):**
+```json
+{
+  "model_id": "model-bachat-backend",
+  "container_id": "bachat-backend",
+  "version": 0,
+  "feature_version": "v1",
+  "status": "UNTRAINED",
+  "trained_at": null,
+  "sample_count": null,
+  "parameters": null
+}
 ```
+
+---
+
+#### List All Models
+```http
 GET /api/ml/models
 ```
 
-List all registered models.
+List all registered models (trained and untrained).
 
-### Delete Model
-
+**Response:**
+```json
+[
+  {
+    "model_id": "model-bachat-backend",
+    "container_id": "bachat-backend",
+    "version": 1,
+    "status": "READY",
+    ...
+  },
+  {
+    "model_id": "model-bachat-frontend",
+    "container_id": "bachat-frontend",
+    "version": 2,
+    "status": "READY",
+    ...
+  }
+]
 ```
+
+---
+
+#### Delete Model
+```http
 DELETE /api/ml/models/{container_id}
 ```
 
-Delete a container's model.
+Delete a container's model from memory and disk.
+
+**Response:**
+```json
+{
+  "status": "deleted",
+  "container_id": "bachat-backend"
+}
+```
+
+**Status Codes:**
+- `200 OK` - Model deleted
+- `404 Not Found` - No model found for container
+
+---
+
+## API Summary Table
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Service health check |
+| `GET` | `/api/health` | Service health check (alias) |
+| `POST` | `/api/ml/score` | Score a feature vector |
+| `POST` | `/api/ml/train` | Train a model |
+| `GET` | `/api/ml/models` | List all models |
+| `GET` | `/api/ml/models/{container_id}` | Get model metadata |
+| `DELETE` | `/api/ml/models/{container_id}` | Delete a model |
 
 ## Running Tests
 
@@ -279,4 +386,5 @@ ml-service/
 ├── Dockerfile
 └── README.md
 ```
+
 

@@ -130,50 +130,256 @@ To monitor Docker containers, the agent needs access to:
    sudo setcap cap_bpf,cap_perfmon,cap_sys_admin+ep ./deepkernel-agent
    ```
 
-## API Endpoints (Agent HTTP Server)
+## API Reference
 
-The agent exposes an HTTP server for receiving commands from the DeepKernel server:
+The agent exposes an HTTP server on port **8082** (configurable via `DK_AGENT_LISTEN_PORT`) for receiving commands from the DeepKernel server.
 
 ### Health Check
-```
+```http
 GET /health
-Response: {"status":"healthy"}
 ```
+
+Returns agent health status.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "agent_id": "node-1",
+  "uptime_seconds": 3600,
+  "containers_monitored": 5
+}
+```
+
+**Status:** `200 OK`
+
+---
 
 ### Request Long Dump
-```
+```http
 POST /long-dump-requests
 Content-Type: application/json
+```
 
+Instructs the agent to start a long dump (baseline recording) for a specific container.
+
+**Request:**
+```json
 {
-  "container_id": "demo-backend",
+  "container_id": "bachat-backend",
   "duration_sec": 1200,
   "reason": "INITIAL_TRAINING"
 }
-
-Response: 202 Accepted
-{"status":"dump_requested"}
 ```
 
-### Apply Policy
+**Parameters:**
+- `container_id` - Container to record (must match filter regex if configured)
+- `duration_sec` - Recording duration in seconds
+- `reason` - Purpose of dump: `INITIAL_TRAINING`, `RETRAIN`, `DIAGNOSTIC`
+
+**Response:**
+```json
+{
+  "status": "dump_requested",
+  "container_id": "bachat-backend",
+  "duration_sec": 1200,
+  "dump_path": "/var/lib/deepkernel/dumps/bachat-backend.bin"
+}
 ```
+
+**Status:** `202 Accepted`
+
+**Behavior:**
+1. Agent starts recording syscalls to binary file
+2. After `duration_sec` seconds, dump stops
+3. Agent sends completion notification to server: `POST /api/v1/agent/dump-complete`
+
+---
+
+### Apply Security Policy
+```http
 POST /policies
 Content-Type: application/json
+```
 
+Applies a Seccomp security policy to a container (called by server when threat detected).
+
+**Request:**
+```json
 {
-  "container_id": "demo-backend",
+  "container_id": "bachat-backend",
   "policy_id": "policy-001",
   "type": "SECCOMP",
   "spec": {
+    "version": "1.0",
+    "default_action": "SCMP_ACT_ALLOW",
     "syscalls": [
-      {"name": "connect", "action": "SCMP_ACT_ERRNO"}
+      {
+        "name": "connect",
+        "action": "SCMP_ACT_ERRNO"
+      },
+      {
+        "name": "execve",
+        "action": "SCMP_ACT_LOG"
+      }
     ]
   }
 }
-
-Response: 200 OK
-{"status":"APPLIED","policy_id":"policy-001"}
 ```
+
+**Policy Types:**
+- `SECCOMP` - Syscall filtering (currently supported)
+- `NETWORK` - Network policy (future)
+- `FILE` - File access policy (future)
+
+**Actions:**
+- `SCMP_ACT_ERRNO` - Block syscall with `EPERM` error (enforcement mode)
+- `SCMP_ACT_LOG` - Log syscall attempt (audit mode)
+- `SCMP_ACT_ALLOW` - Allow syscall
+
+**Response:**
+```json
+{
+  "status": "APPLIED",
+  "policy_id": "policy-001",
+  "container_id": "bachat-backend",
+  "timestamp": "2025-12-12T10:00:00Z"
+}
+```
+
+**Status:** `200 OK`
+
+**Enforcement:**
+1. Agent generates OCI-compliant Seccomp JSON profile
+2. Saves to `$DK_POLICY_DIR/<container_id>.json`
+3. Updates container via Docker API: `docker update --security-opt seccomp=<profile>`
+4. Container restart may be required for enforcement
+
+---
+
+## Outbound API Calls (Agent → Server)
+
+The agent makes these calls to the DeepKernel server:
+
+### Send Syscall Window
+```http
+POST http://localhost:9090/api/v1/agent/windows
+Content-Type: application/json
+```
+
+Sends a 5-second syscall window for real-time analysis.
+
+**Frequency:** Every 5 seconds (configurable via `DK_SHORT_WINDOW_SEC`)
+
+**Request:**
+```json
+{
+  "version": 1,
+  "agent_id": "node-1",
+  "container_id": "bachat-backend",
+  "window_start_ts_ns": 1702396800000000000,
+  "records": [
+    {
+      "delta_ts_us": 1234,
+      "syscall_id": 257,
+      "arg_class": 1,
+      "arg_bucket": 2
+    },
+    ...
+  ]
+}
+```
+
+**Retry Logic:** 3 retries with exponential backoff (1s, 2s, 4s)
+
+---
+
+### Notify Long Dump Complete
+```http
+POST http://localhost:9090/api/v1/agent/dump-complete
+Content-Type: application/json
+```
+
+Notifies server when a long dump finishes.
+
+**Request:**
+```json
+{
+  "agent_id": "node-1",
+  "container_id": "bachat-backend",
+  "dump_path": "/var/lib/deepkernel/dumps/bachat-backend.bin",
+  "start_ts_ns": 1702396800000000000,
+  "duration_sec": 1200,
+  "record_count": 15000
+}
+```
+
+**Purpose:** Triggers ML model training pipeline on server.
+
+---
+
+## API Summary Table
+
+### Agent HTTP Server (Inbound)
+
+| Method | Endpoint | Description | Called By |
+|--------|----------|-------------|-----------|
+| `GET` | `/health` | Health check | Server, monitoring |
+| `POST` | `/long-dump-requests` | Start baseline recording | Server |
+| `POST` | `/policies` | Apply security policy | Server |
+
+### Agent HTTP Client (Outbound)
+
+| Method | Endpoint | Description | Frequency |
+|--------|----------|-------------|-----------|
+| `POST` | `/api/v1/agent/windows` | Send syscall window | Every 5s |
+| `POST` | `/api/v1/agent/dump-complete` | Long dump finished | On completion |
+
+---
+
+## Data Formats
+
+### Syscall Record (Binary Dump)
+```c
+struct TraceRecord {
+    uint32_t delta_ts_us;   // Microseconds since window start
+    uint16_t syscall_id;    // x86_64 syscall number
+    uint8_t  arg_class;     // Category: 1=FILE, 2=NET, 3=PROC, 4=MEM, 0=OTHER
+    uint8_t  arg_bucket;    // Bucketed argument value
+} __attribute__((packed));  // 8 bytes
+```
+
+### Binary Dump File Structure
+```
+┌────────────────────────────────────┐
+│ Header (80 bytes)                  │
+│ - version: uint32                  │
+│ - syscall_vocab_size: uint32       │
+│ - container_id: char[64]           │
+│ - start_ts_ns: uint64              │
+├────────────────────────────────────┤
+│ TraceRecord 1 (8 bytes)            │
+├────────────────────────────────────┤
+│ TraceRecord 2 (8 bytes)            │
+├────────────────────────────────────┤
+│ ...                                │
+├────────────────────────────────────┤
+│ TraceRecord N (8 bytes)            │
+└────────────────────────────────────┘
+```
+
+**Usage:** ML training utility (`ml-service/tools/train_from_dump.py`) parses this format.
+
+---
+
+## Error Codes
+
+| Code | Message | Cause |
+|------|---------|-------|
+| `400` | Invalid request body | Malformed JSON |
+| `404` | Container not found | Container not being monitored |
+| `500` | Policy application failed | Docker API error |
+| `503` | Agent not ready | eBPF not loaded |
 
 ## Syscall Classification
 

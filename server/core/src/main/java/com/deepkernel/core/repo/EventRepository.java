@@ -27,5 +27,22 @@ public class EventRepository {
         int from = Math.max(filtered.size() - limit, 0);
         return filtered.subList(from, filtered.size());
     }
+
+    /**
+     * Clear all events.
+     * @return number of events cleared
+     */
+    public int clearAll() {
+        int count = events.size();
+        events.clear();
+        return count;
+    }
+
+    /**
+     * Get count of stored events.
+     */
+    public int count() {
+        return events.size();
+    }
 }
 
