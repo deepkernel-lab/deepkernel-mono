@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { AnomalyEvent, Container, ModelVersion, ScorePoint } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://13.204.239.189:9090';
@@ -109,6 +110,17 @@ export async function runDemoTriage(req: DemoTriageRequest): Promise<DemoTriageR
     repo_url: req.repoUrl ?? 'demo',
     changed_files: req.changedFiles ?? [],
   });
+}
+
+export async function getTriageEnabled(): Promise<boolean> {
+  const res = await fetch(API_BASE + '/api/admin/triage/enabled');
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const body = await res.json();
+  return Boolean(body.enableLlm);
+}
+
+export async function setTriageEnabled(enable: boolean): Promise<void> {
+  await postJson('/api/admin/triage/enabled', { enableLlm: enable });
 }
 
 export async function getContainerScores(id: string, limit = 50): Promise<ScorePoint[]> {

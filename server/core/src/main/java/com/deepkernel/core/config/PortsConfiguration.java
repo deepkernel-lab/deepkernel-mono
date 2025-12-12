@@ -12,6 +12,7 @@ import com.deepkernel.contracts.ports.PolicyGeneratorPort;
 import com.deepkernel.contracts.ports.TriagePort;
 import com.deepkernel.policy.DefaultPolicyGenerator;
 import com.deepkernel.triage.GeminiTriageAdapter;
+import com.deepkernel.core.service.TriageToggleService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,8 +41,11 @@ public class PortsConfiguration {
     @Value("${deepkernel.gemini.api-key:}")
     private String geminiApiKey;
     
-    @Value("${deepkernel.gemini.model:gemini-pro}")
+    @Value("${deepkernel.gemini.model:gemini-1.5-flash}")
     private String geminiModel;
+
+    @Value("${deepkernel.triage.enable-llm:false}")
+    private boolean enableLlm;
     
     @Value("${deepkernel.anomaly.mode:HYBRID}")
     private String anomalyMode;
@@ -88,8 +92,13 @@ public class PortsConfiguration {
     }
 
     @Bean
-    public TriagePort triagePort() {
-        return new GeminiTriageAdapter(geminiApiKey, geminiModel);
+    public TriageToggleService triageToggleService() {
+        return new TriageToggleService(enableLlm);
+    }
+
+    @Bean
+    public TriagePort triagePort(TriageToggleService triageToggleService) {
+        return new GeminiTriageAdapter(geminiApiKey, geminiModel, enableLlm, triageToggleService::isEnabled);
     }
 
     @Bean

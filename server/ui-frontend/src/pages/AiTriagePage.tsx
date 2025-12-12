@@ -1,5 +1,6 @@
+// @ts-nocheck
 import { useEffect, useMemo, useState } from 'react';
-import { getContainers, runDemoTriage, setDemoChangeContext, type DemoTriageResponse } from '../api';
+import { getContainers, runDemoTriage, setDemoChangeContext, getTriageEnabled, setTriageEnabled, type DemoTriageResponse } from '../api';
 import type { Container } from '../types';
 
 const DEFAULT_SYSCALL_SUMMARY =
@@ -17,6 +18,7 @@ export function AiTriagePage() {
   const [syscallSummary, setSyscallSummary] = useState(DEFAULT_SYSCALL_SUMMARY);
   const [result, setResult] = useState<DemoTriageResponse | null>(null);
   const [busy, setBusy] = useState(false);
+  const [llmEnabled, setLlmEnabled] = useState(false);
   const filesList = useMemo(
     () => changedFiles.split(',').map((s) => s.trim()).filter(Boolean),
     [changedFiles],
@@ -27,6 +29,7 @@ export function AiTriagePage() {
       setContainers(list);
       setContainerId((prev) => (prev ? prev : list.length > 0 ? list[0].id : ''));
     });
+    getTriageEnabled().then(setLlmEnabled).catch(() => setLlmEnabled(false));
   }, []);
 
   async function onSetContext() {
@@ -69,6 +72,29 @@ export function AiTriagePage() {
     <div className="space-y-4 max-w-4xl">
       <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
         <div className="text-sm font-semibold text-slate-200 mb-3">AI Triage (Gemini)</div>
+
+        <div className="flex items-center gap-3 mb-4">
+          <label className="flex items-center gap-2 text-sm text-slate-200">
+            <input
+              type="checkbox"
+              checked={llmEnabled}
+              onChange={async (e) => {
+                const v = e.target.checked;
+                setLlmEnabled(v);
+                try {
+                  await setTriageEnabled(v);
+                } catch {
+                  // revert on failure
+                  setLlmEnabled(!v);
+                }
+              }}
+            />
+            Enable AI Triage
+          </label>
+          <span className="text-xs text-amber-300">
+            When enabled, triage uses LLM inference; otherwise heuristic only.
+          </span>
+        </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div>

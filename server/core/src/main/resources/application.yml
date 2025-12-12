@@ -16,8 +16,10 @@ deepkernel:
   ws:
     allowed-origins: "*" 
   gemini:
-    api-key: ${GEMINI_API_KEY:AIzaSyD7i8RQ7uDvsFhEtRWX_rL8E3WoIrPb_4s}
-    model: gemini-pro
+    api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-1.5-flash}
+  triage:
+    enable-llm: ${DEEPKERNEL_ENABLE_LLM:false}
   # Anomaly detection configuration
   # mode: LOCAL (in-process only), REMOTE (ml-service only), HYBRID (prefer remote, fallback to local)
   anomaly:
