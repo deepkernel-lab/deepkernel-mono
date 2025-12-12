@@ -11,7 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    @Value("${deepkernel.ws.allowed-origins:http://localhost:5173,http://localhost:3000}")
+    @Value("${deepkernel.ws.allowed-origins:*}")
     private String allowedOrigins;
 
     @Override

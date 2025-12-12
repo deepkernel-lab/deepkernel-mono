@@ -28,7 +28,7 @@ class Config:
     random_state: int = 42
     
     # Anomaly threshold
-    anomaly_threshold: float = -0.5  # Scores below this are anomalous
+    anomaly_threshold: float = -0.6  # Scores below this are anomalous
     
     @classmethod
     def from_env(cls) -> "Config":
@@ -43,7 +43,7 @@ class Config:
             contamination=float(os.getenv("ISOLATION_FOREST_CONTAMINATION", "0.1")),
             max_samples=int(os.getenv("ISOLATION_FOREST_MAX_SAMPLES", "256")),
             random_state=int(os.getenv("ISOLATION_FOREST_RANDOM_STATE", "42")),
-            anomaly_threshold=float(os.getenv("ANOMALY_THRESHOLD", "-0.5")),
+            anomaly_threshold=float(os.getenv("ANOMALY_THRESHOLD", "-0.6")),
         )
 
 

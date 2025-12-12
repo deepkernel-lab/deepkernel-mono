@@ -104,7 +104,8 @@ static __always_inline __u8 classify_arg_class(long syscall_id) {
     return ARG_CLASS_OTHER;
 }
 
-SEC("tracepoint/syscalls/sys_enter")
+// SEC("tracepoint/syscalls/sys_enter")
+SEC("tracepoint/raw_syscalls/sys_enter")
 int handle_sys_enter(struct trace_event_raw_sys_enter *ctx) {
     struct dk_syscall_event_t *evt;
     __u64 pid_tgid = bpf_get_current_pid_tgid();

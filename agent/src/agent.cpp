@@ -81,7 +81,8 @@ bool Agent::initBpf() {
         return false;
     }
 
-    bpf_link* link = bpf_program__attach_tracepoint(prog, "syscalls", "sys_enter");
+    // bpf_link* link = bpf_program__attach_tracepoint(prog, "syscalls", "sys_enter");
+    bpf_link* link = bpf_program__attach_tracepoint(prog, "raw_syscalls", "sys_enter");
     if (!link) {
         std::cerr << "Failed to attach tracepoint\n";
         return false;

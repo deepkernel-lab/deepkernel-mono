@@ -16,7 +16,7 @@ public class ContainerRepository {
 
     public ContainerRepository() {
         // Seed with an example to power UI quickly.
-        Container example = new Container("prod/billing-api", "prod", "worker-01", "Running", true, ModelStatus.UNTRAINED);
+        Container example = new Container("billing-api", "prod", "worker-01", "Running", true, ModelStatus.UNTRAINED);
         containers.put(example.id(), example);
     }
 

@@ -9,7 +9,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class CorsConfig {
 
-    @Value("${deepkernel.ui.origin:http://localhost:5173}")
+    @Value("${deepkernel.ui.origin:*}")
     private String uiOrigin;
 
     @Bean
