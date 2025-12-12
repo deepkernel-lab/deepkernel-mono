@@ -9,8 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import numpy as np
+
 from ..config import config
-from ..schemas import ModelMeta, ModelStatus
+from ..schemas import ModelMeta, ModelStats, ModelStatus
 from .isolation_forest import IsolationForestModel
 
 logger = logging.getLogger(__name__)
@@ -214,6 +216,73 @@ class ModelRegistry:
         """Get the number of registered models."""
         with self._lock:
             return len(self._models)
+    
+    def get_model_stats(self, container_id: str) -> Optional[ModelStats]:
+        """
+        Get detailed statistics for a container's model.
+        
+        Args:
+            container_id: Container identifier
+            
+        Returns:
+            ModelStats or None if no model exists
+        """
+        model = self.get_model(container_id)
+        
+        if model is None:
+            return None
+        
+        status = ModelStatus.READY if model.is_fitted else ModelStatus.UNTRAINED
+        
+        # Get model file info
+        model_path = self._get_model_path(container_id)
+        model_file_path = str(model_path) if model_path.exists() else None
+        model_file_size = model_path.stat().st_size if model_path.exists() else None
+        
+        # Extract sklearn model internals if fitted
+        feature_importances_mean = None
+        feature_importances_std = None
+        offset = None
+        
+        if model.is_fitted and model.model is not None:
+            try:
+                # Isolation Forest doesn't have feature_importances_ directly,
+                # but we can compute from the estimators
+                if hasattr(model.model, 'estimators_'):
+                    # Get decision function offset
+                    if hasattr(model.model, 'offset_'):
+                        offset = float(model.model.offset_)
+                    
+                    # Compute feature importance from tree structure
+                    importances = []
+                    for tree in model.model.estimators_:
+                        if hasattr(tree, 'feature_importances_'):
+                            importances.append(tree.feature_importances_)
+                    
+                    if importances:
+                        importances = np.array(importances)
+                        feature_importances_mean = float(np.mean(importances))
+                        feature_importances_std = float(np.std(importances))
+            except Exception as e:
+                logger.warning(f"Could not extract model internals: {e}")
+        
+        return ModelStats(
+            model_id=model.model_id,
+            container_id=model.container_id,
+            version=model.version,
+            status=status,
+            trained_at=model.trained_at,
+            sample_count=model.sample_count if model.is_fitted else None,
+            n_estimators=model.n_estimators,
+            contamination=model.contamination,
+            max_samples=model.max_samples,
+            feature_importances_mean=feature_importances_mean,
+            feature_importances_std=feature_importances_std,
+            offset=offset,
+            anomaly_threshold=config.anomaly_threshold,
+            model_file_path=model_file_path,
+            model_file_size_bytes=model_file_size,
+        )
     
     def _save_to_disk(self, container_id: str, model: IsolationForestModel) -> None:
         """Save a model to disk."""

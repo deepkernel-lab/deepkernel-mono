@@ -162,7 +162,7 @@ def main():
         sys.exit(1)
     
     # Generate training data
-    print(f"🔧 Generating {args.samples} synthetic baseline feature vectors...")
+    print(f"   Generating {args.samples} synthetic baseline feature vectors...")
     print(f"   Simulating normal web application behavior")
     
     training_data = []
@@ -173,7 +173,7 @@ def main():
     print(f"   Generated {len(training_data)} × {FEATURE_DIM}-dim vectors")
     
     # Check ML service health
-    print(f"\n🔗 Connecting to ML service: {args.ml_service_url}")
+    print(f"\n  Connecting to ML service: {args.ml_service_url}")
     if not check_health(args.ml_service_url):
         print("Error: ML service is not reachable. Is it running?", file=sys.stderr)
         print("   Start with: cd ml-service && python -m src.main", file=sys.stderr)
@@ -181,7 +181,7 @@ def main():
     print("   ML service is healthy")
     
     # Train model
-    print(f"\n🎯 Training model for container: {args.container_id}")
+    print(f"\n Training model for container: {args.container_id}")
     
     try:
         result = train_model(
@@ -190,7 +190,7 @@ def main():
             training_data,
             args.reason
         )
-        print(f"\n✅ Training complete!")
+        print(f"\n Training complete!")
         print(f"   Model ID:      {result.get('model_id')}")
         print(f"   Version:       {result.get('version')}")
         print(f"   Status:        {result.get('status')}")

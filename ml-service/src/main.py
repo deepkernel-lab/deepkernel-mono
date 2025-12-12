@@ -22,6 +22,7 @@ from .schemas import (
     ErrorResponse,
     HealthResponse,
     ModelMeta,
+    ModelStats,
     ModelStatus,
     ScoreRequest,
     ScoreResponse,
@@ -315,6 +316,38 @@ async def delete_model(container_id: str):
         )
     
     return {"status": "deleted", "container_id": container_id}
+
+
+@app.get(
+    "/api/ml/models/{container_id}/stats",
+    response_model=ModelStats,
+    tags=["ML"],
+    summary="Get detailed model statistics",
+)
+async def get_model_stats(container_id: str):
+    """
+    Get detailed statistics for a container's Isolation Forest model.
+    
+    Includes:
+    - Training parameters
+    - Model internals (offset, feature importances)
+    - Storage information
+    """
+    if registry is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service not initialized",
+        )
+    
+    stats = registry.get_model_stats(container_id)
+    
+    if stats is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No model found for container {container_id}",
+        )
+    
+    return stats
 
 
 # ============== Main Entry Point ==============

@@ -112,3 +112,32 @@ class ErrorResponse(BaseModel):
     message: str = Field(..., description="Error message")
     detail: Optional[str] = Field(None, description="Additional details")
 
+
+class ModelStats(BaseModel):
+    """Detailed model statistics."""
+    model_id: str = Field(..., description="Model identifier")
+    container_id: str = Field(..., description="Container identifier")
+    version: int = Field(..., description="Model version")
+    status: ModelStatus = Field(..., description="Model status")
+    
+    # Training info
+    trained_at: Optional[datetime] = Field(None, description="Training timestamp")
+    sample_count: Optional[int] = Field(None, description="Number of training samples")
+    
+    # Model parameters
+    n_estimators: Optional[int] = Field(None, description="Number of trees")
+    contamination: Optional[float] = Field(None, description="Expected anomaly ratio")
+    max_samples: Optional[int] = Field(None, description="Samples per tree")
+    
+    # Model stats (from sklearn)
+    feature_importances_mean: Optional[float] = Field(None, description="Mean feature importance")
+    feature_importances_std: Optional[float] = Field(None, description="Std of feature importances")
+    offset: Optional[float] = Field(None, description="Model decision offset")
+    
+    # Scoring thresholds
+    anomaly_threshold: float = Field(..., description="Score threshold for anomaly detection")
+    
+    # Storage info
+    model_file_path: Optional[str] = Field(None, description="Path to persisted model file")
+    model_file_size_bytes: Optional[int] = Field(None, description="Size of model file")
+

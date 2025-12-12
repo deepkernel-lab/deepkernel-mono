@@ -359,7 +359,7 @@ Examples:
         sys.exit(1)
     
     # Parse dump file
-    print(f"📂 Reading dump file: {args.dump_file}")
+    print(f" Reading dump file: {args.dump_file}")
     try:
         header, records = parse_dump_file(args.dump_file)
     except Exception as e:
@@ -378,7 +378,7 @@ Examples:
     # Split into windows
     window_duration_us = args.window_sec * 1_000_000
     windows = split_into_windows(records, window_duration_us)
-    print(f"\n📊 Split into {len(windows)} windows ({args.window_sec}s each)")
+    print(f"\n Split into {len(windows)} windows ({args.window_sec}s each)")
     
     # Filter windows with minimum records
     valid_windows = [w for w in windows if len(w) >= args.min_records]
@@ -390,7 +390,7 @@ Examples:
             sys.exit(1)
     
     # Extract features
-    print(f"\n🔬 Extracting {FEATURE_DIM}-dim feature vectors...")
+    print(f"\n Extracting {FEATURE_DIM}-dim feature vectors...")
     training_data = []
     for i, window in enumerate(valid_windows):
         features = extract_features(window)
@@ -408,18 +408,18 @@ Examples:
               f"mean={statistics.mean(all_vals):.4f}")
     
     if args.dry_run:
-        print("\n✅ Dry run complete. No training performed.")
+        print("\n Dry run complete. No training performed.")
         return
     
     # Check ML service health
-    print(f"\n🔗 Connecting to ML service: {args.ml_service_url}")
+    print(f"\n Connecting to ML service: {args.ml_service_url}")
     if not check_health(args.ml_service_url):
         print("Error: ML service is not reachable", file=sys.stderr)
         sys.exit(1)
     print("   ML service is healthy")
     
     # Train model
-    print(f"\n🎯 Training model for container: {args.container_id}")
+    print(f"\n Training model for container: {args.container_id}")
     print(f"   Training samples: {len(training_data)}")
     print(f"   Reason: {args.reason}")
     
@@ -430,7 +430,7 @@ Examples:
             training_data,
             args.reason
         )
-        print(f"\n✅ Training complete!")
+        print(f"\n Training complete!")
         print(f"   Model ID:      {result.get('model_id')}")
         print(f"   Version:       {result.get('version')}")
         print(f"   Status:        {result.get('status')}")
