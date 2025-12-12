@@ -9,6 +9,7 @@ import com.deepkernel.core.api.dto.UiContainerView;
 import com.deepkernel.core.repo.AnomalyWindowRepository;
 import com.deepkernel.core.repo.ContainerRepository;
 import com.deepkernel.core.repo.PolicyRepository;
+import com.deepkernel.core.repo.TriageResultRepository;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -23,6 +24,7 @@ class ContainerViewServiceTest {
         ContainerRepository containerRepository = new ContainerRepository();
         AnomalyWindowRepository windowRepository = new AnomalyWindowRepository();
         PolicyRepository policyRepository = new PolicyRepository();
+        TriageResultRepository triageResultRepository = new TriageResultRepository();
         ModelRegistryService modelRegistryService = new ModelRegistryService();
 
         Container c = new Container("c1", "ns", "node1", "Running", true, ModelStatus.READY);
@@ -34,7 +36,13 @@ class ContainerViewServiceTest {
         policyRepository.save(new com.deepkernel.contracts.model.Policy(
                 "p1", "c1", PolicyType.SECCOMP, Map.of(), Instant.now(), "node1", PolicyStatus.APPLIED
         ));
-        ContainerViewService svc = new ContainerViewService(containerRepository, modelRegistryService, windowRepository, policyRepository);
+        ContainerViewService svc = new ContainerViewService(
+                containerRepository,
+                modelRegistryService,
+                windowRepository,
+                policyRepository,
+                triageResultRepository
+        );
 
         UiContainerView view = svc.list().stream().filter(v -> v.id().equals("c1")).findFirst().orElseThrow();
         assertEquals("THREAT", view.lastVerdict());
