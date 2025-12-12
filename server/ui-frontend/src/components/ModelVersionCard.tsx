@@ -1,10 +1,9 @@
+import React from 'react';
 import { ModelVersion } from '../types';
 
-type Props = {
-  model: ModelVersion;
-};
+type Props = { model: ModelVersion };
 
-export function ModelVersionCard({ model }: Props) {
+export const ModelVersionCard: React.FC<Props> = ({ model }) => {
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
       <div className="text-sm text-slate-400">Version {model.version}</div>
@@ -13,5 +12,5 @@ export function ModelVersionCard({ model }: Props) {
       <div className="text-sm text-slate-400">Trained: {model.trainedAt}</div>
     </div>
   );
-}
+};
 

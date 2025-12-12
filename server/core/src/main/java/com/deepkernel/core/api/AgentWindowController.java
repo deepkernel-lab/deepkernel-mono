@@ -25,6 +25,7 @@ import com.deepkernel.core.repo.PolicyRepository;
 import com.deepkernel.core.repo.TriageResultRepository;
 import com.deepkernel.core.service.FeatureExtractor;
 import com.deepkernel.core.service.SyscallWindowSummarizer;
+import com.deepkernel.core.service.TrainingService;
 import com.deepkernel.core.service.model.LiveEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
