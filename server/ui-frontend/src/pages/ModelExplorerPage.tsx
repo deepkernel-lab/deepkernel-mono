@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getContainers, getContainerModels } from '../api';
+import { getContainers, getContainerModels, triggerTraining } from '../api';
 import { Container, ModelVersion } from '../types';
 import { ModelVersionCard } from '../components/ModelVersionCard';
 
@@ -43,6 +43,26 @@ export function ModelExplorerPage() {
           <ModelVersionCard key={m.version} model={m} />
         ))}
       </div>
+      {selected && models.length === 0 && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-slate-200">
+          <div className="text-sm font-semibold mb-1">No models found for this container</div>
+          <div className="text-sm text-slate-400">
+            This is expected until training runs at least once. For demo, you can create a placeholder model entry.
+          </div>
+          <div className="mt-3">
+            <button
+              className="rounded-md bg-sky-500/20 text-sky-200 border border-sky-500/40 px-3 py-2 text-sm hover:bg-sky-500/30"
+              onClick={async () => {
+                await triggerTraining(selected);
+                const list = await getContainerModels(selected);
+                setModels(list);
+              }}
+            >
+              Create model (trigger training)
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

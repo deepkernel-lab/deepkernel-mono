@@ -1,11 +1,15 @@
 package com.deepkernel.core.api;
 
+import com.deepkernel.contracts.model.Container;
 import com.deepkernel.core.repo.ContainerRepository;
 import com.deepkernel.core.repo.EventRepository;
+import com.deepkernel.core.service.ModelRegistryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Admin endpoints for managing DeepKernel server state.
@@ -18,10 +22,14 @@ public class AdminController {
 
     private final ContainerRepository containerRepository;
     private final EventRepository eventRepository;
+    private final ModelRegistryService modelRegistryService;
 
-    public AdminController(ContainerRepository containerRepository, EventRepository eventRepository) {
+    public AdminController(ContainerRepository containerRepository, 
+                          EventRepository eventRepository,
+                          ModelRegistryService modelRegistryService) {
         this.containerRepository = containerRepository;
         this.eventRepository = eventRepository;
+        this.modelRegistryService = modelRegistryService;
     }
 
     /**
@@ -96,6 +104,42 @@ public class AdminController {
         return ResponseEntity.ok(Map.of(
             "containerCount", containerRepository.count(),
             "eventCount", eventRepository.count()
+        ));
+    }
+    
+    /**
+     * Sync model status from ML service for all known containers.
+     * 
+     * POST /api/admin/models/sync
+     * 
+     * This queries the ML service for each container and updates
+     * the local model registry with the current status.
+     */
+    @PostMapping("/models/sync")
+    public ResponseEntity<Map<String, Object>> syncModelsFromMlService() {
+        List<String> containerIds = containerRepository.findAll().stream()
+            .map(Container::id)
+            .collect(Collectors.toList());
+        
+        int synced = modelRegistryService.syncFromMlService(containerIds);
+        
+        return ResponseEntity.ok(Map.of(
+            "status", "synced",
+            "containersChecked", containerIds.size(),
+            "modelsSynced", synced
+        ));
+    }
+    
+    /**
+     * Clear the model registry cache.
+     * 
+     * POST /api/admin/models/clear
+     */
+    @PostMapping("/models/clear")
+    public ResponseEntity<Map<String, Object>> clearModelCache() {
+        modelRegistryService.clearCache();
+        return ResponseEntity.ok(Map.of(
+            "status", "cleared"
         ));
     }
 }

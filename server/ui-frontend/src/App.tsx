@@ -3,6 +3,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ContainerPage } from './pages/ContainerPage';
 import { LiveEventsPage } from './pages/LiveEventsPage';
 import { ModelExplorerPage } from './pages/ModelExplorerPage';
+import { AiTriagePage } from './pages/AiTriagePage';
 
 const NavLink = ({ to, label }: { to: string; label: string }) => {
   const location = useLocation();
@@ -31,6 +32,7 @@ function App() {
           <NavLink to="/" label="Dashboard" />
           <NavLink to="/live" label="Live Events" />
           <NavLink to="/models" label="Model Explorer" />
+          <NavLink to="/triage" label="AI Triage" />
         </nav>
       </header>
       <main className="p-6">
@@ -39,6 +41,7 @@ function App() {
           <Route path="/container/:id" element={<ContainerPage />} />
           <Route path="/live" element={<LiveEventsPage />} />
           <Route path="/models" element={<ModelExplorerPage />} />
+          <Route path="/triage" element={<AiTriagePage />} />
         </Routes>
       </main>
     </div>
