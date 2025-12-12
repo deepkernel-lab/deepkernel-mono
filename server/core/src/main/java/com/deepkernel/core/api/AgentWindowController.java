@@ -24,6 +24,7 @@ import com.deepkernel.core.repo.EventRepository;
 import com.deepkernel.core.repo.PolicyRepository;
 import com.deepkernel.core.repo.TriageResultRepository;
 import com.deepkernel.core.service.FeatureExtractor;
+import com.deepkernel.core.service.SyscallWindowSummarizer;
 import com.deepkernel.core.service.model.LiveEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +57,7 @@ public class AgentWindowController {
     private final PolicyRepository policyRepository;
     private final EventRepository eventRepository;
     private final ContainerRepository containerRepository;
+    private final SyscallWindowSummarizer syscallWindowSummarizer = new SyscallWindowSummarizer();
 
     public AgentWindowController(AnomalyDetectionPort anomalyDetectionPort,
                                  FeatureExtractor featureExtractor,
@@ -131,6 +133,30 @@ public class AgentWindowController {
             );
         } catch (Exception e) {
             log.debug("Could not retrieve change context: {}", e.getMessage());
+        }
+
+        // Attach syscall window summary to change context for LLM triage
+        String syscallSummary = syscallWindowSummarizer.summarize(payload.records());
+        if (changeContext != null) {
+            changeContext = new ChangeContext(
+                    changeContext.containerId(),
+                    changeContext.commitId(),
+                    changeContext.repoUrl(),
+                    changeContext.changedFiles(),
+                    (changeContext.diffSummary() == null ? "" : changeContext.diffSummary())
+                            + "\n\nSYSCALL_WINDOW_SUMMARY:\n" + syscallSummary,
+                    changeContext.deployedAt()
+            );
+        } else {
+            // Create a minimal context so LLM always sees syscall window info
+            changeContext = new ChangeContext(
+                    payload.containerId(),
+                    "unknown",
+                    "unknown",
+                    java.util.List.of(),
+                    "SYSCALL_WINDOW_SUMMARY:\n" + syscallSummary,
+                    null
+            );
         }
 
         // Perform triage

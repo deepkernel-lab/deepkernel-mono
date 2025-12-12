@@ -1,33 +1,47 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getContainers, getContainerModels } from '../api';
-import { Container, ModelVersion } from '../types';
+import { getContainers, getContainerModels, getContainerScores } from '../api';
+import { Container, ModelVersion, ScorePoint } from '../types';
 import { ContainerStatusCard } from '../components/ContainerStatusCard';
 import { AnomalyScoreChart } from '../components/AnomalyScoreChart';
 import { VerdictCard } from '../components/VerdictCard';
 import { PolicyCard } from '../components/PolicyCard';
 import { ModelVersionCard } from '../components/ModelVersionCard';
+import { useWebsocketEvents } from '../hooks/useWebsocketEvents';
 
 export function ContainerPage() {
   const { id } = useParams<{ id: string }>();
   const [container, setContainer] = useState<Container | null>(null);
   const [models, setModels] = useState<ModelVersion[]>([]);
+  const [scores, setScores] = useState<ScorePoint[]>([]);
+  const wsEvents = useWebsocketEvents();
 
   useEffect(() => {
     getContainers().then((list) => setContainer(list.find((c) => c.id === id) ?? null));
     if (id) {
       getContainerModels(id).then(setModels);
+      getContainerScores(id, 60).then(setScores);
     }
   }, [id]);
 
-  const chartData = useMemo(() => {
-    const base = container?.lastScore ?? -0.2;
-    return [
-      { ts: 't-3', score: base - 0.1 },
-      { ts: 't-2', score: base - 0.05 },
-      { ts: 't-1', score: base },
-    ];
-  }, [container?.lastScore]);
+  // Append live scores from WebSocket events (WINDOW_SCORED)
+  useEffect(() => {
+    if (!id || wsEvents.length === 0) return;
+    const evt: any = wsEvents[0];
+    if (evt?.type !== 'WINDOW_SCORED') return;
+    const cid = evt.containerId ?? evt.container_id;
+    if (cid !== id) return;
+    const payload = evt.payload ?? evt;
+    const ts = String(evt.timestamp ?? new Date().toISOString());
+    const score = Number(payload.ml_score ?? payload.score ?? 0);
+    const anomalous = Boolean(payload.is_anomalous ?? payload.anomalous ?? false);
+    setScores((prev) => {
+      const next = [...prev, { ts, score, anomalous }];
+      return next.slice(Math.max(next.length - 60, 0));
+    });
+  }, [id, wsEvents]);
+
+  const chartData = useMemo(() => scores.map((p) => ({ ts: p.ts, score: p.score })), [scores]);
 
   if (!container) {
     return <div className="text-slate-300">Loading container...</div>;
@@ -40,7 +54,11 @@ export function ContainerPage() {
         <div className="lg:col-span-2">
           <AnomalyScoreChart scores={chartData} />
         </div>
-        <VerdictCard verdict={(container.lastVerdict as any) ?? 'UNKNOWN'} score={container.lastScore} explanation="LLM explanation will appear here." />
+        <VerdictCard
+          verdict={(container.lastVerdict as any) ?? 'UNKNOWN'}
+          score={container.lastScore}
+          explanation={container.lastExplanation ?? '—'}
+        />
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
         <PolicyCard

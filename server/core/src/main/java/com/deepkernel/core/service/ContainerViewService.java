@@ -8,6 +8,7 @@ import com.deepkernel.core.api.dto.UiContainerView;
 import com.deepkernel.core.repo.AnomalyWindowRepository;
 import com.deepkernel.core.repo.ContainerRepository;
 import com.deepkernel.core.repo.PolicyRepository;
+import com.deepkernel.core.repo.TriageResultRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,15 +20,18 @@ public class ContainerViewService {
     private final ModelRegistryService modelRegistryService;
     private final AnomalyWindowRepository windowRepository;
     private final PolicyRepository policyRepository;
+    private final TriageResultRepository triageResultRepository;
 
     public ContainerViewService(ContainerRepository repository,
                                 ModelRegistryService modelRegistryService,
                                 AnomalyWindowRepository windowRepository,
-                                PolicyRepository policyRepository) {
+                                PolicyRepository policyRepository,
+                                TriageResultRepository triageResultRepository) {
         this.repository = repository;
         this.modelRegistryService = modelRegistryService;
         this.windowRepository = windowRepository;
         this.policyRepository = policyRepository;
+        this.triageResultRepository = triageResultRepository;
     }
 
     public List<UiContainerView> list() {
@@ -39,10 +43,12 @@ public class ContainerViewService {
         ModelStatus status = meta != null ? meta.status() : c.modelStatus();
         var latestWindow = windowRepository.latest(c.id());
         var latestPolicy = policyRepository.latest(c.id());
+        var latestTriage = latestWindow != null ? triageResultRepository.latestForWindow(latestWindow.id()) : null;
         String verdict = latestWindow != null && latestWindow.triageStatus() != null
                 ? latestWindow.triageStatus().name()
                 : null;
         Double score = latestWindow != null ? latestWindow.mlScore() : null;
+        String explanation = latestTriage != null ? latestTriage.explanation() : null;
         String deploy = null; // placeholder for deploy info
         String policyStatus = latestPolicy != null && latestPolicy.status() != null ? latestPolicy.status().name() : null;
         String policyType = latestPolicy != null && latestPolicy.type() != null ? latestPolicy.type().name() : null;
@@ -55,6 +61,7 @@ public class ContainerViewService {
                 status,
                 verdict,
                 score,
+                explanation,
                 deploy,
                 policyStatus,
                 policyType

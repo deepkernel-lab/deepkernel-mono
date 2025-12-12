@@ -46,8 +46,8 @@ private:
     // Get container ID (hash) from name
     std::string getContainerIdFromName(const std::string& containerName);
 
-    // Call Docker API to update container
-    bool updateContainerSeccomp(const std::string& containerId, const std::string& profilePath);
+    // Best-effort demo enforcement (Docker CLI update + restart)
+    bool updateContainerSeccomp(const std::string& containerName, const std::string& profilePath);
 
     // HTTP communication with Docker socket
     std::string httpDockerGet(const std::string& path);

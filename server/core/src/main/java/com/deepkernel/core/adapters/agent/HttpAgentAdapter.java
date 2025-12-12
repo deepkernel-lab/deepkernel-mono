@@ -4,8 +4,6 @@ import com.deepkernel.contracts.model.LongDumpComplete;
 import com.deepkernel.contracts.model.LongDumpRequest;
 import com.deepkernel.contracts.model.Policy;
 import com.deepkernel.contracts.ports.AgentControlPort;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
@@ -27,13 +25,11 @@ public class HttpAgentAdapter implements AgentControlPort {
 
     private final RestTemplate restTemplate;
     private final String baseUrl;
-    private final ObjectMapper objectMapper;
 
     public HttpAgentAdapter(RestTemplate restTemplate,
                             @Value("${deepkernel.agent.base-url:http://localhost:8082}") String baseUrl) {
         this.restTemplate = restTemplate;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-        this.objectMapper = new ObjectMapper();
     }
 
     @Override
@@ -66,19 +62,14 @@ public class HttpAgentAdapter implements AgentControlPort {
 
     @Override
     public void applyPolicy(String agentId, String containerId, Policy policy) {
-        String url = baseUrl + "/api/v1/agent/" + agentId + "/containers/" + containerId + "/policies";
+        // Agent demo server endpoint is POST /policies (no path params)
+        String url = baseUrl + "/policies";
         
         Map<String, Object> body = new HashMap<>();
         body.put("container_id", containerId);
         body.put("policy_id", policy.id());
-        body.put("policy_type", policy.type().name());
-        
-        try {
-            body.put("spec_json", objectMapper.writeValueAsString(policy.spec()));
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize policy spec: {}", e.getMessage());
-            return;
-        }
+        body.put("type", policy.type().name());
+        body.put("spec", policy.spec());
         
         try {
             HttpHeaders headers = new HttpHeaders();

@@ -92,8 +92,8 @@ bool PolicyEnforcer::apply(const std::string& containerName, const std::string& 
         return true;
     }
 
-    // Apply via Docker API
-    bool success = updateContainerSeccomp(containerId, profilePath);
+    // Best-effort demo enforcement (Docker CLI update + restart)
+    bool success = updateContainerSeccomp(containerName, profilePath);
 
     // Record the policy
     appliedPolicies_[policyId] = AppliedPolicy{
@@ -139,7 +139,10 @@ std::string PolicyEnforcer::generateSeccompProfile(const std::string& specJson) 
     // defaultAction: ALLOW, with a single rule on connect.
     // - If enforcementMode_ == LOG -> SCMP_ACT_LOG
     // - Else -> SCMP_ACT_ERRNO
-    // - Use an arg filter to target high ports (>=1024) to avoid blocking internal low ports.
+    //
+    // IMPORTANT: Seccomp cannot inspect the destination port inside the sockaddr* passed to connect(2),
+    // so port-based filtering is not possible with classic seccomp rules. We therefore block/log
+    // connect(2) entirely for demo enforcement when a THREAT is detected.
 
     std::ostringstream profile;
     profile << "{\n";
@@ -147,21 +150,18 @@ std::string PolicyEnforcer::generateSeccompProfile(const std::string& specJson) 
     profile << "  \"architectures\": [\"SCMP_ARCH_X86_64\", \"SCMP_ARCH_X86\", \"SCMP_ARCH_X32\"],\n";
 
     // Add comment about enforcement mode
-    profile << "  \"comment\": \"DeepKernel generated policy - mode=" << enforcementMode_ << " (connect>=1024)\",\n";
+    profile << "  \"comment\": \"DeepKernel generated policy - mode=" << enforcementMode_ << " (block connect)\",\n";
 
     profile << "  \"syscalls\": [\n";
 
     // Determine action based on enforcement mode
     std::string effectiveAction = (enforcementMode_ == "LOG") ? "SCMP_ACT_LOG" : "SCMP_ACT_ERRNO";
 
-    // Default: connect with port >= 1024
+    // Default: connect(2)
     profile << "    {\n";
     profile << "      \"names\": [\"connect\"],\n";
     profile << "      \"action\": \"" << effectiveAction << "\",\n";
-    profile << "      \"args\": [\n";
-    profile << "        {\"index\": 1, \"op\": \"SCMP_CMP_GE\", \"value\": 1024}\n";
-    profile << "      ],\n";
-    profile << "      \"comment\": \"Deny/log connect to high ports (>=1024); adjust as needed\"\n";
+    profile << "      \"comment\": \"Deny/log connect(2) for demo containment\"\n";
     profile << "    }\n";
 
     profile << "\n  ]\n";
@@ -196,23 +196,36 @@ std::string PolicyEnforcer::getContainerIdFromName(const std::string& containerN
     return extractJsonString(response, "Id");
 }
 
-bool PolicyEnforcer::updateContainerSeccomp(const std::string& containerId, const std::string& profilePath) {
-    // Note: Docker doesn't support updating Seccomp profile on running containers
-    // The profile needs to be set at container start time
-    // For demo purposes, we'll log this limitation
-    
-    std::cout << "PolicyEnforcer: Seccomp profile written to " << profilePath << "\n";
-    std::cout << "PolicyEnforcer: Note - Container needs restart to apply Seccomp profile\n";
-    std::cout << "PolicyEnforcer: Run: docker update --security-opt seccomp=" << profilePath << " " << containerId.substr(0, 12) << "\n";
-    
-    // For a full implementation, you would:
-    // 1. Stop the container
-    // 2. Update its config with the new Seccomp profile
-    // 3. Start the container again
-    // 
-    // Or use docker run with --security-opt seccomp=<profile>
-    
-    return true;  // Return true for demo - profile was written
+bool PolicyEnforcer::updateContainerSeccomp(const std::string& containerName, const std::string& profilePath) {
+    // Best-effort demo automation using Docker CLI:
+    // - docker update --security-opt seccomp=<profile> <container>
+    // - docker restart <container>
+    //
+    // Some Docker runtimes may not support live-updating seccomp; if the update fails we keep the
+    // profile on disk and log the manual steps.
+
+    std::cout << "PolicyEnforcer: Attempting Docker update+restart for " << containerName << "\n";
+
+    std::string updateCmd =
+        "docker update --security-opt seccomp=\"" + profilePath + "\" \"" + containerName + "\" > /dev/null 2>&1";
+    int rcUpdate = std::system(updateCmd.c_str());
+    if (rcUpdate != 0) {
+        std::cout << "PolicyEnforcer: Docker update failed (rc=" << rcUpdate << "). Manual fallback:\n";
+        std::cout << "PolicyEnforcer:   docker update --security-opt seccomp=\"" << profilePath << "\" \"" << containerName << "\"\n";
+        std::cout << "PolicyEnforcer:   docker restart \"" << containerName << "\"\n";
+        return false;
+    }
+
+    std::string restartCmd = "docker restart \"" + containerName + "\" > /dev/null 2>&1";
+    int rcRestart = std::system(restartCmd.c_str());
+    if (rcRestart != 0) {
+        std::cout << "PolicyEnforcer: Docker restart failed (rc=" << rcRestart << "). Manual fallback:\n";
+        std::cout << "PolicyEnforcer:   docker restart \"" << containerName << "\"\n";
+        return false;
+    }
+
+    std::cout << "PolicyEnforcer: Docker update+restart succeeded for " << containerName << "\n";
+    return true;
 }
 
 std::string PolicyEnforcer::httpDockerGet(const std::string& path) {

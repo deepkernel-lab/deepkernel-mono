@@ -28,7 +28,7 @@ class Config:
     random_state: int = 42
     
     # Anomaly threshold
-    anomaly_threshold: float = -0.6  # Scores below this are anomalous
+    anomaly_threshold: float = -0.7  # Scores below this are anomalous
     
     @classmethod
     def from_env(cls) -> "Config":

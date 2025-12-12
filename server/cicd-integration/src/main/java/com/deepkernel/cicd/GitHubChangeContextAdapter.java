@@ -113,14 +113,13 @@ public class GitHubChangeContextAdapter implements ChangeContextPort {
         ));
         
         // Demo deployment for a backend service
-        recentDeployments.put("bachat-backend", new ChangeContext(
-            "bachat-backend",
+        recentDeployments.put("bachat-bank_backend_1", new ChangeContext(
+            "bachat-bank_backend_1",
             "deadbeef12345678",
             "https://github.com/deepkernel-lab/bachat-bank",
             List.of(
-                "backend/app.py",
-                "backend/routes/transactions.py",
-                "backend/models.py"
+                "demo-apps/bachat-bank/backend/main.py",
+                "demo-apps/bachat-bank/backend/routes.py"
             ),
             "Updated transaction processing with new validation rules",
             Instant.now().minus(5, ChronoUnit.MINUTES)

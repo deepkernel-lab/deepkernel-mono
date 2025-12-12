@@ -11,6 +11,7 @@ public record UiContainerView(
         ModelStatus modelStatus,
         String lastVerdict,
         Double lastScore,
+        String lastExplanation,
         String lastDeploy,
         String policyStatus,
         String policyType

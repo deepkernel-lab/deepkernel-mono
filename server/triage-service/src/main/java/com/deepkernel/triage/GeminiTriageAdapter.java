@@ -27,7 +27,9 @@ import java.util.regex.Pattern;
 public class GeminiTriageAdapter implements TriagePort {
     private static final Logger log = LoggerFactory.getLogger(GeminiTriageAdapter.class);
     
-    private static final String GEMINI_URL_TEMPLATE = 
+    private static final String GEMINI_URL_TEMPLATE_V1BETA =
+        "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s";
+    private static final String GEMINI_URL_TEMPLATE_V1 =
         "https://generativelanguage.googleapis.com/v1/models/%s:generateContent?key=%s";
     
     private final String apiKey;
@@ -65,7 +67,8 @@ public class GeminiTriageAdapter implements TriagePort {
     
     private TriageResult triageWithGemini(AnomalyWindow window, ChangeContext changeContext) {
         String prompt = buildPrompt(window, changeContext);
-        String url = String.format(GEMINI_URL_TEMPLATE, model, apiKey);
+        String urlV1beta = String.format(GEMINI_URL_TEMPLATE_V1BETA, model, apiKey);
+        String urlV1 = String.format(GEMINI_URL_TEMPLATE_V1, model, apiKey);
         
         Map<String, Object> requestBody = Map.of(
             "contents", List.of(Map.of(
@@ -81,7 +84,13 @@ public class GeminiTriageAdapter implements TriagePort {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
         
-        String response = restTemplate.postForObject(url, entity, String.class);
+        String response;
+        try {
+            response = restTemplate.postForObject(urlV1beta, entity, String.class);
+        } catch (Exception v1betaErr) {
+            log.debug("Gemini v1beta call failed (will retry v1): {}", v1betaErr.getMessage());
+            response = restTemplate.postForObject(urlV1, entity, String.class);
+        }
         log.debug("Gemini response: {}", response);
         
         return parseGeminiResponse(window, response);
@@ -107,13 +116,25 @@ public class GeminiTriageAdapter implements TriagePort {
             sb.append("RECENT CODE CHANGES: None available\n\n");
         }
         
-        sb.append("Based on this information, provide a security triage assessment.\n");
+        sb.append("TASK:\n");
+        sb.append("- Decide if this is a THREAT or SAFE change.\n");
+        sb.append("- If THREAT, propose a Seccomp policy that blocks the suspicious behavior.\n");
+        sb.append("\n");
         sb.append("Respond in this exact JSON format:\n");
         sb.append("{\n");
         sb.append("  \"verdict\": \"THREAT\" or \"SAFE\",\n");
         sb.append("  \"risk_score\": 0.0 to 1.0,\n");
-        sb.append("  \"explanation\": \"Brief explanation of the assessment\"\n");
+        sb.append("  \"explanation\": \"Brief explanation of the assessment\",\n");
+        sb.append("  \"policy\": {\n");
+        sb.append("    \"type\": \"SECCOMP\",\n");
+        sb.append("    \"spec\": {\n");
+        sb.append("      \"profile_name\": \"dk-demo-block-connect\",\n");
+        sb.append("      \"syscalls\": [ { \"name\": \"connect\", \"action\": \"SCMP_ACT_ERRNO\" } ]\n");
+        sb.append("    }\n");
+        sb.append("  }\n");
         sb.append("}\n");
+        sb.append("\n");
+        sb.append("If verdict is SAFE, set policy to null.\n");
         
         return sb.toString();
     }
@@ -134,6 +155,9 @@ public class GeminiTriageAdapter implements TriagePort {
             String verdict = parsed.path("verdict").asText("UNKNOWN");
             double riskScore = parsed.path("risk_score").asDouble(0.5);
             String explanation = parsed.path("explanation").asText("No explanation provided.");
+
+            // Preserve parsed JSON (including optional policy) in llmResponseRaw for downstream policy generation.
+            String parsedJsonForStorage = parsed.toString();
             
             return new TriageResult(
                 UUID.randomUUID().toString(),
@@ -142,7 +166,7 @@ public class GeminiTriageAdapter implements TriagePort {
                 riskScore,
                 verdict.toUpperCase(),
                 explanation,
-                response
+                parsedJsonForStorage
             );
         } catch (Exception e) {
             log.error("Failed to parse Gemini response: {}", e.getMessage());

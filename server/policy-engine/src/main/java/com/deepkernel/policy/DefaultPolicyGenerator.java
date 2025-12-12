@@ -17,17 +17,37 @@ public class DefaultPolicyGenerator implements PolicyGeneratorPort {
         if (!"THREAT".equalsIgnoreCase(triageResult.verdict())) {
             return null;
         }
-        Map<String, Object> spec = Map.of(
-                "type", "SECCOMP",
-                "profile_name", "dk-deny-inet-high-ports",
-                "syscalls", java.util.List.of(
-                        Map.of(
-                                "name", "connect",
-                                "action", "SCMP_ACT_ERRNO",
-                                "args", java.util.List.of(Map.of("index", 1, "op", "SCMP_CMP_GE", "value", 1024))
-                        )
-                )
-        );
+
+        // Prefer LLM-proposed policy if present in triageResult.llmResponseRaw (JSON).
+        Map<String, Object> spec = null;
+        try {
+            if (triageResult.llmResponseRaw() != null && !triageResult.llmResponseRaw().isBlank()) {
+                com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.JsonNode root = om.readTree(triageResult.llmResponseRaw());
+                com.fasterxml.jackson.databind.JsonNode policyNode = root.path("policy");
+                if (!policyNode.isMissingNode() && !policyNode.isNull()) {
+                    com.fasterxml.jackson.databind.JsonNode specNode = policyNode.path("spec");
+                    if (!specNode.isMissingNode() && !specNode.isNull()) {
+                        spec = om.convertValue(specNode, java.util.Map.class);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // fall back to default demo policy
+        }
+
+        if (spec == null) {
+            spec = Map.of(
+                    "profile_name", "dk-demo-block-connect",
+                    "syscalls", java.util.List.of(
+                            Map.of(
+                                    "name", "connect",
+                                    "action", "SCMP_ACT_ERRNO"
+                            )
+                    )
+            );
+        }
+
         return new Policy(
                 UUID.randomUUID().toString(),
                 window.containerId(),
