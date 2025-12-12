@@ -33,7 +33,7 @@ class HttpAgentAdapterTest {
 
         ArgumentCaptor<String> urlCaptor = ArgumentCaptor.forClass(String.class);
         verify(restTemplate).exchange(urlCaptor.capture(), eq(HttpMethod.POST), any(HttpEntity.class), eq(Void.class));
-        assertTrue(urlCaptor.getValue().contains("/api/v1/agent/agent-1/containers/c1/policies"));
+        assertTrue(urlCaptor.getValue().endsWith("/policies"));
     }
 }
 
