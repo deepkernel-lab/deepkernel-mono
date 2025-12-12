@@ -22,8 +22,8 @@ public class SyscallWindowSummarizer {
         int fileOps = 0, netOps = 0, procOps = 0, memOps = 0, otherOps = 0;
 
         for (TraceRecord r : records) {
-            counts.merge(r.syscall_id(), 1, Integer::sum);
-            switch (r.arg_class()) {
+            counts.merge(r.syscallId(), 1, Integer::sum);
+            switch (r.argClass()) {
                 case 1 -> fileOps++;
                 case 2 -> netOps++;
                 case 3 -> procOps++;
@@ -41,7 +41,7 @@ public class SyscallWindowSummarizer {
         // Very small sequence sample (first N ids)
         int n = Math.min(records.size(), 25);
         String seq = records.subList(0, n).stream()
-                .map(r -> mapSyscallName(r.syscall_id()))
+                .map(r -> mapSyscallName(r.syscallId()))
                 .collect(Collectors.joining(" → "));
 
         return "record_count=" + records.size() + "\n" +
