@@ -6,10 +6,10 @@ services:
       context: .
       dockerfile: Dockerfile.server # assume existing or to-be-added
     environment:
-      - DEEPKERNEL_AGENT_BASE_URL=http://localhost:8080
+      - DEEPKERNEL_AGENT_BASE_URL=http://localhost:8082
       - DEEPKERNEL_WS_ALLOWED_ORIGINS=http://localhost:5173
     ports:
-      - "8080:8080"
+      - "8082:8082"
     depends_on:
       - ml
   ml:

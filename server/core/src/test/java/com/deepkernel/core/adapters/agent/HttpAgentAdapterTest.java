@@ -22,7 +22,7 @@ class HttpAgentAdapterTest {
     @Test
     void applyPolicyPostsToAgent() {
         RestTemplate restTemplate = mock(RestTemplate.class);
-        HttpAgentAdapter adapter = new HttpAgentAdapter(restTemplate, "http://localhost:8080");
+        HttpAgentAdapter adapter = new HttpAgentAdapter(restTemplate, "http://localhost:8082");
 
         Policy policy = new Policy("p1", "c1", PolicyType.SECCOMP, Map.of(), Instant.now(), "node1", PolicyStatus.PENDING);
 

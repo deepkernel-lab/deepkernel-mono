@@ -1,0 +1,385 @@
+diff --git a/ARCHITECTURE_DKO.md b/ARCHITECTURE_DKO.md
+index 40a4d83..747e02a 100644
+--- a/ARCHITECTURE_DKO.md
++++ b/ARCHITECTURE_DKO.md
+@@ -505,7 +505,7 @@ Port Summary:
+ |----------|---------|-------------|
+ | `DK_AGENT_ID` | `node-1` | Agent identifier |
+ | `DK_SERVER_URL` | `http://localhost:9090` | Server URL |
+-| `DK_AGENT_PORT` | `7070` | Agent HTTP server port |
++| `DK_AGENT_PORT` | `8082` | Agent HTTP server port |
+ | `DK_SHORT_WINDOW_SEC` | `5` | Window duration |
+ | `DK_DOCKER_SOCKET` | `/var/run/docker.sock` | Docker socket path |
+ | `DK_CONTAINER_FILTER` | `.*` | Regex to filter containers |
+diff --git a/README.md b/README.md
+index e994eed..0ba71bb 100644
+--- a/README.md
++++ b/README.md
+@@ -81,7 +81,7 @@ uvicorn src.main:app --reload --port 8081
+ cd server
+ ./gradlew :core:bootRun
+ # Optional env:
+-#   DEEPKERNEL_AGENT_BASE_URL=http://localhost:8080
++#   DEEPKERNEL_AGENT_BASE_URL=http://localhost:8082
+ #   DEEPKERNEL_WS_ALLOWED_ORIGINS=http://localhost:5173
+ #   DEEPKERNEL_UI_ORIGIN=http://localhost:5173
+ ```
+diff --git a/agent/README.md b/agent/README.md
+index 8e79bec..3b2c187 100644
+--- a/agent/README.md
++++ b/agent/README.md
+@@ -70,7 +70,7 @@ sudo ./deepkernel-agent
+ | Variable | Default | Description |
+ |----------|---------|-------------|
+ | `DK_AGENT_ID` | `node-1` | Unique identifier for this agent |
+-| `DK_SERVER_URL` | `http://localhost:8080` | DeepKernel server URL |
++| `DK_SERVER_URL` | `http://localhost:9090` | DeepKernel server URL |
+ | `DK_NODE_NAME` | `worker-01` | Kubernetes node name |
+ | `DK_SHORT_WINDOW_SEC` | `5` | Short window duration (seconds) |
+ | `DK_MIN_EVENTS_PER_WINDOW` | `20` | Minimum events to trigger window send |
+@@ -80,7 +80,7 @@ sudo ./deepkernel-agent
+ | `DK_AUTO_BASELINE_DUMP` | `0` | Auto-start baseline dump (0=no, 1=yes) |
+ | `DK_DOCKER_SOCKET` | `/var/run/docker.sock` | Docker socket path |
+ | `DK_CONTAINER_CACHE_TTL` | `60` | Container name cache TTL (seconds) |
+-| `DK_AGENT_LISTEN_PORT` | `8081` | HTTP server port for commands |
++| `DK_AGENT_LISTEN_PORT` | `8082` | HTTP server port for commands |
+ | `DK_CONTAINER_FILTER` | `` | Regex to filter containers (empty=all) |
+ | `DK_POLICY_DIR` | `/var/lib/deepkernel/policies` | Directory for policy files |
+ | `DK_POLICY_ENFORCEMENT_MODE` | `ERRNO` | Policy action: `ERRNO` (block) or `LOG` (audit only) |
+@@ -89,7 +89,7 @@ sudo ./deepkernel-agent
+ 
+ ```bash
+ export DK_AGENT_ID="demo-agent"
+-export DK_SERVER_URL="http://localhost:8080"
++export DK_SERVER_URL="http://localhost:9090"
+ export DK_CONTAINER_FILTER="bachat"
+ export DK_DUMP_DIR="./dumps"
+ export DK_POLICY_DIR="./policies"
+@@ -218,7 +218,7 @@ Failed to POST window for container
+ ```
+ 
+ **Solutions:**
+-1. Verify server URL: `curl http://localhost:8080/health`
++1. Verify server URL: `curl http://localhost:9090/health`
+ 2. Check network connectivity
+ 3. Review `DK_MIN_EVENTS_PER_WINDOW` setting
+ 
+diff --git a/agent/include/config.h b/agent/include/config.h
+index a43af3a..653f23b 100644
+--- a/agent/include/config.h
++++ b/agent/include/config.h
+@@ -5,7 +5,7 @@
+ struct AgentConfig {
+     // Basic agent identification
+     std::string agentId{"node-1"};
+-    std::string serverUrl{"http://localhost:8080"};
++    std::string serverUrl{"http://localhost:9090"};
+     std::string nodeName{"worker-01"};
+ 
+     // Window settings
+@@ -24,7 +24,7 @@ struct AgentConfig {
+     int containerMapCacheTTL{60};  // seconds
+ 
+     // Agent HTTP server (for receiving commands from DeepKernel server)
+-    int agentListenPort{8081};
++    int agentListenPort{8082};
+ 
+     // Container filtering (regex pattern, empty = monitor all)
+     std::string containerFilterRegex;
+diff --git a/demo-apps/bachat-bank/README.md b/demo-apps/bachat-bank/README.md
+index bb5b1d0..288be0d 100644
+--- a/demo-apps/bachat-bank/README.md
++++ b/demo-apps/bachat-bank/README.md
+@@ -17,7 +17,7 @@ docker-compose logs -f
+ ```
+ 
+ Frontend: http://localhost:3000  
+-Backend: internal at http://backend:8000 (inside compose)
++Backend: internal at http://localhost:8000 (inside compose)
+ 
+ Switch modes:
+ ```bash
+@@ -30,7 +30,7 @@ Environment:
+ - MODE (normal|malicious|safe)
+ - EXFIL_URL (only malicious)
+ - PAYMENTS_URL (only safe)
+-- VITE_BACKEND_URL (frontend, defaults to http://backend:8000)
++- VITE_BACKEND_URL (frontend, defaults to http://localhost:8000)
+ 
+ ## DeepKernel integration (demo)
+ - Run DeepKernel agent + server on host; set agent to monitor compose network `bachat` / containers `frontend` and `backend`.
+diff --git a/demo-apps/bachat-bank/backend/main.py b/demo-apps/bachat-bank/backend/main.py
+index b29c473..85585ea 100644
+--- a/demo-apps/bachat-bank/backend/main.py
++++ b/demo-apps/bachat-bank/backend/main.py
+@@ -5,6 +5,7 @@ from typing import Optional
+ import httpx
+ from fastapi import FastAPI, HTTPException, Header
+ from pydantic import BaseModel
++from fastapi.middleware.cors import CORSMiddleware
+ 
+ 
+ MODE = os.getenv("MODE", "normal").lower()
+@@ -12,6 +13,15 @@ EXFIL_URL = os.getenv("EXFIL_URL", "https://example.com:4444/steal")
+ PAYMENTS_URL = os.getenv("PAYMENTS_URL", "http://payments-internal:8080/reconcile")
+ 
+ app = FastAPI(title="Bachat Bank Backend", version="0.1.0")
++frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://13.204.239.189:3000", "http://localhost:3000")
++
++app.add_middleware(
++    CORSMiddleware,
++    allow_origins=[frontend_origin],
++    allow_credentials=True,
++    allow_methods=["*"],
++    allow_headers=["*"],
++)
+ 
+ USERS = {"demo": {"name": "Demo User", "accounts": [{"id": "CHK-001", "balance": 1250.55}]}}
+ TOKEN = "demo-token"
+diff --git a/demo-apps/bachat-bank/docker-compose.yml b/demo-apps/bachat-bank/docker-compose.yml
+index 3a3233d..c19d53e 100644
+--- a/demo-apps/bachat-bank/docker-compose.yml
++++ b/demo-apps/bachat-bank/docker-compose.yml
+@@ -17,7 +17,7 @@ services:
+     build:
+       context: ./frontend
+     environment:
+-      - VITE_BACKEND_URL=http://backend:8000
++      - VITE_BACKEND_URL=${VITE_BACKEND_URL:-http://13.204.239.189:8000}
+     ports:
+       - "3000:3000"
+     depends_on:
+diff --git a/demo-apps/bachat-bank/frontend/Dockerfile b/demo-apps/bachat-bank/frontend/Dockerfile
+index 7bc1ba7..af7e5ec 100644
+--- a/demo-apps/bachat-bank/frontend/Dockerfile
++++ b/demo-apps/bachat-bank/frontend/Dockerfile
+@@ -1,5 +1,12 @@
+ FROM node:18-alpine AS build
+ WORKDIR /app
++
++# Inject the backend URL at build time so the static bundle points to a
++# host the browser can reach (the frontend runs in the user's browser,
++# not inside the container network).
++ARG VITE_BACKEND_URL=http://13.204.239.189:8000
++ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
++
+ COPY package.json package-lock.json* ./
+ RUN npm install
+ COPY . .
+diff --git a/demo-apps/bachat-bank/frontend/src/api.js b/demo-apps/bachat-bank/frontend/src/api.js
+index caa5db8..3a7a120 100644
+--- a/demo-apps/bachat-bank/frontend/src/api.js
++++ b/demo-apps/bachat-bank/frontend/src/api.js
+@@ -1,4 +1,4 @@
+-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://backend:8000';
++const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+ 
+ export async function login(username, password) {
+   const res = await fetch(`${BACKEND_URL}/login`, {
+diff --git a/docker-compose.demo.yml b/docker-compose.demo.yml
+index c060e7d..668ef7b 100644
+--- a/docker-compose.demo.yml
++++ b/docker-compose.demo.yml
+@@ -6,10 +6,10 @@ services:
+       context: .
+       dockerfile: Dockerfile.server # assume existing or to-be-added
+     environment:
+-      - DEEPKERNEL_AGENT_BASE_URL=http://localhost:8080
++      - DEEPKERNEL_AGENT_BASE_URL=http://localhost:8082
+       - DEEPKERNEL_WS_ALLOWED_ORIGINS=http://localhost:5173
+     ports:
+-      - "8080:8080"
++      - "8082:8082"
+     depends_on:
+       - ml
+   ml:
+diff --git a/ml-service/README.md b/ml-service/README.md
+index 6c3dc1e..67ddfe9 100644
+--- a/ml-service/README.md
++++ b/ml-service/README.md
+@@ -224,6 +224,37 @@ docker run -p 8081:8081 \
+   deepkernel-ml-service:latest
+ ```
+ 
++## Training Tools
++
++The `tools/` directory contains utilities for training models:
++
++### From Agent Binary Dump
++
++When the agent collects a long dump (baseline recording), use:
++
++```bash
++python tools/train_from_dump.py /var/deepkernel/dumps/backend.bin \
++    --container-id bachat-backend \
++    --window-sec 5 \
++    --min-records 20
++```
++
++Options:
++- `--window-sec`: Window duration (default: 5 seconds)
++- `--min-records`: Minimum syscalls per window (default: 20)
++- `--dry-run`: Analyze dump without training
++- `-v`: Verbose output
++
++### Synthetic Baseline (Demo/Testing)
++
++For quick demos without real syscall data:
++
++```bash
++python tools/train_baseline.py --container-id bachat-backend --samples 100
++```
++
++This generates synthetic feature vectors that mimic normal web application behavior.
++
+ ## Architecture
+ 
+ ```
+@@ -235,6 +266,9 @@ ml-service/
+ │   └── models/
+ │       ├── isolation_forest.py  # IsolationForest wrapper
+ │       └── model_registry.py    # Per-container model storage
++├── tools/
++│   ├── train_from_dump.py   # Train from agent binary dumps
++│   └── train_baseline.py    # Synthetic baseline training
+ ├── tests/
+ │   ├── test_health.py
+ │   ├── test_score.py
+diff --git a/scripts/mock-agent-send.sh b/scripts/mock-agent-send.sh
+index d7bf83b..c5d9a93 100644
+--- a/scripts/mock-agent-send.sh
++++ b/scripts/mock-agent-send.sh
+@@ -2,7 +2,7 @@
+ set -euo pipefail
+ 
+ HOST=${HOST:-localhost}
+-PORT=${PORT:-8080}
++PORT=${PORT:-9090}
+ CONTAINER_ID=${CONTAINER_ID:-demo/container}
+ AGENT_ID=${AGENT_ID:-agent-1}
+ START_TS=${START_TS:-1000000}
+diff --git a/scripts/smoke.sh b/scripts/smoke.sh
+index 94f0e3b..2314ba9 100644
+--- a/scripts/smoke.sh
++++ b/scripts/smoke.sh
+@@ -2,7 +2,7 @@
+ set -euo pipefail
+ 
+ HOST=${HOST:-localhost}
+-PORT=${PORT:-8080}
++PORT=${PORT:-9090}
+ 
+ echo "[smoke] sending sample window"
+ ./scripts/mock-agent-send.sh
+diff --git a/server/core/src/main/java/com/deepkernel/core/adapters/agent/HttpAgentAdapter.java b/server/core/src/main/java/com/deepkernel/core/adapters/agent/HttpAgentAdapter.java
+index 06a3b9e..f09ab6a 100644
+--- a/server/core/src/main/java/com/deepkernel/core/adapters/agent/HttpAgentAdapter.java
++++ b/server/core/src/main/java/com/deepkernel/core/adapters/agent/HttpAgentAdapter.java
+@@ -30,7 +30,7 @@ public class HttpAgentAdapter implements AgentControlPort {
+     private final ObjectMapper objectMapper;
+ 
+     public HttpAgentAdapter(RestTemplate restTemplate,
+-                            @Value("${deepkernel.agent.base-url:http://localhost:7070}") String baseUrl) {
++                            @Value("${deepkernel.agent.base-url:http://localhost:8082}") String baseUrl) {
+         this.restTemplate = restTemplate;
+         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+         this.objectMapper = new ObjectMapper();
+diff --git a/server/core/src/main/java/com/deepkernel/core/config/PortsConfiguration.java b/server/core/src/main/java/com/deepkernel/core/config/PortsConfiguration.java
+index 065ce00..da92b08 100644
+--- a/server/core/src/main/java/com/deepkernel/core/config/PortsConfiguration.java
++++ b/server/core/src/main/java/com/deepkernel/core/config/PortsConfiguration.java
+@@ -34,7 +34,7 @@ public class PortsConfiguration {
+     
+     private static final Logger log = LoggerFactory.getLogger(PortsConfiguration.class);
+ 
+-    @Value("${deepkernel.agent.base-url:http://localhost:7070}")
++    @Value("${deepkernel.agent.base-url:http://localhost:8082}")
+     private String agentBaseUrl;
+     
+     @Value("${deepkernel.gemini.api-key:}")
+diff --git a/server/core/src/main/resources/application.yml b/server/core/src/main/resources/application.yml
+index dbc9292..d8933f2 100644
+--- a/server/core/src/main/resources/application.yml
++++ b/server/core/src/main/resources/application.yml
+@@ -10,11 +10,11 @@ spring:
+ deepkernel:
+   feature-version: v1
+   agent:
+-    base-url: http://localhost:7070
++    base-url: http://localhost:8082
+   ui:
+     origin: http://localhost:5173
+   ws:
+-    allowed-origins: http://localhost:5173,http://localhost:3000
++    allowed-origins: http://localhost:5173,http://localhost:3000,http://13.204.239.189:5173
+   gemini:
+     api-key: ${GEMINI_API_KEY:}
+     model: gemini-pro
+diff --git a/server/core/src/test/java/com/deepkernel/core/adapters/agent/HttpAgentAdapterTest.java b/server/core/src/test/java/com/deepkernel/core/adapters/agent/HttpAgentAdapterTest.java
+index 47af8c6..cbd9fac 100644
+--- a/server/core/src/test/java/com/deepkernel/core/adapters/agent/HttpAgentAdapterTest.java
++++ b/server/core/src/test/java/com/deepkernel/core/adapters/agent/HttpAgentAdapterTest.java
+@@ -22,7 +22,7 @@ class HttpAgentAdapterTest {
+     @Test
+     void applyPolicyPostsToAgent() {
+         RestTemplate restTemplate = mock(RestTemplate.class);
+-        HttpAgentAdapter adapter = new HttpAgentAdapter(restTemplate, "http://localhost:8080");
++        HttpAgentAdapter adapter = new HttpAgentAdapter(restTemplate, "http://localhost:8082");
+ 
+         Policy policy = new Policy("p1", "c1", PolicyType.SECCOMP, Map.of(), Instant.now(), "node1", PolicyStatus.PENDING);
+ 
+diff --git a/server/ui-frontend/public/index.html b/server/ui-frontend/public/index.html
+deleted file mode 100644
+index 0576457..0000000
+--- a/server/ui-frontend/public/index.html
++++ /dev/null
+@@ -1,13 +0,0 @@
+-<!doctype html>
+-<html lang="en">
+-  <head>
+-    <meta charset="UTF-8" />
+-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+-    <title>DeepKernel UI</title>
+-  </head>
+-  <body>
+-    <div id="root"></div>
+-    <script type="module" src="../src/main.tsx"></script>
+-  </body>
+-</html>
+-
+diff --git a/server/ui-frontend/src/api.ts b/server/ui-frontend/src/api.ts
+index b943292..6449594 100644
+--- a/server/ui-frontend/src/api.ts
++++ b/server/ui-frontend/src/api.ts
+@@ -1,6 +1,6 @@
+ import { AnomalyEvent, Container, ModelVersion } from './types';
+ 
+-const API_BASE = import.meta.env.VITE_API_BASE || '';
++const API_BASE = import.meta.env.VITE_API_BASE || 'http://13.204.239.189:9090';
+ 
+ async function fetchJson<T>(path: string): Promise<T> {
+   const res = await fetch(API_BASE + path);
+diff --git a/server/ui-frontend/vite.config.ts b/server/ui-frontend/vite.config.ts
+index 3043bc8..a57b5e5 100644
+--- a/server/ui-frontend/vite.config.ts
++++ b/server/ui-frontend/vite.config.ts
+@@ -4,7 +4,7 @@ import path from 'path';
+ 
+ export default defineConfig({
+   plugins: [react()],
+-  root: 'public',
++  // root: 'public',  <-- Removed
+   resolve: {
+     alias: {
+       '@src': path.resolve(__dirname, './src'),
+@@ -16,5 +16,10 @@ export default defineConfig({
+     setupFiles: ['./vitest.setup.ts'],
+     include: ['../src/**/*.test.ts'],
+   },
++  server: {
++      host: true, // bind to 0.0.0.0
++      port: 5173,
++      strictPort: true,
++  },
+ });
+ 

@@ -5,7 +5,7 @@
 struct AgentConfig {
     // Basic agent identification
     std::string agentId{"node-1"};
-    std::string serverUrl{"http://localhost:8080"};
+    std::string serverUrl{"http://localhost:9090"};
     std::string nodeName{"worker-01"};
 
     // Window settings
@@ -24,7 +24,7 @@ struct AgentConfig {
     int containerMapCacheTTL{60};  // seconds
 
     // Agent HTTP server (for receiving commands from DeepKernel server)
-    int agentListenPort{8081};
+    int agentListenPort{8082};
 
     // Container filtering (regex pattern, empty = monitor all)
     std::string containerFilterRegex;

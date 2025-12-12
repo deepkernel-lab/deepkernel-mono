@@ -17,7 +17,7 @@ docker-compose logs -f
 ```
 
 Frontend: http://localhost:3000  
-Backend: internal at http://backend:8000 (inside compose)
+Backend: internal at http://localhost:8000 (inside compose)
 
 Switch modes:
 ```bash
@@ -30,7 +30,7 @@ Environment:
 - MODE (normal|malicious|safe)
 - EXFIL_URL (only malicious)
 - PAYMENTS_URL (only safe)
-- VITE_BACKEND_URL (frontend, defaults to http://backend:8000)
+- VITE_BACKEND_URL (frontend, defaults to http://localhost:8000)
 
 ## DeepKernel integration (demo)
 - Run DeepKernel agent + server on host; set agent to monitor compose network `bachat` / containers `frontend` and `backend`.

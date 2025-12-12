@@ -34,7 +34,7 @@ public class PortsConfiguration {
     
     private static final Logger log = LoggerFactory.getLogger(PortsConfiguration.class);
 
-    @Value("${deepkernel.agent.base-url:http://localhost:7070}")
+    @Value("${deepkernel.agent.base-url:http://localhost:8082}")
     private String agentBaseUrl;
     
     @Value("${deepkernel.gemini.api-key:}")

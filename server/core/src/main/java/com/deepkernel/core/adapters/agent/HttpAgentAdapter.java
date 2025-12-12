@@ -30,7 +30,7 @@ public class HttpAgentAdapter implements AgentControlPort {
     private final ObjectMapper objectMapper;
 
     public HttpAgentAdapter(RestTemplate restTemplate,
-                            @Value("${deepkernel.agent.base-url:http://localhost:7070}") String baseUrl) {
+                            @Value("${deepkernel.agent.base-url:http://localhost:8082}") String baseUrl) {
         this.restTemplate = restTemplate;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.objectMapper = new ObjectMapper();

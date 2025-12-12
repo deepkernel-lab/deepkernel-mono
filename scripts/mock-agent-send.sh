@@ -2,7 +2,7 @@
 set -euo pipefail
 
 HOST=${HOST:-localhost}
-PORT=${PORT:-8080}
+PORT=${PORT:-9090}
 CONTAINER_ID=${CONTAINER_ID:-demo/container}
 AGENT_ID=${AGENT_ID:-agent-1}
 START_TS=${START_TS:-1000000}

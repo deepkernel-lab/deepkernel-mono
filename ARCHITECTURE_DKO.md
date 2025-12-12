@@ -72,7 +72,7 @@ The agent runs on the host and captures syscalls from all containers using eBPF 
 │  │                                                                  │    │
 │  │  ┌──────────────────┐  ┌──────────────────────────────────┐    │    │
 │  │  │ HTTP Client      │  │ Agent Server (httplib)           │    │    │
-│  │  │ (libcurl)        │  │ Port: 7070                       │    │    │
+│  │  │ (libcurl)        │  │ Port: 8082                       │    │    │
 │  │  │ → to server:9090 │  │ Receives: long-dump, policies    │    │    │
 │  │  └──────────────────┘  └──────────────────────────────────┘    │    │
 │  │                                                                  │    │
@@ -174,7 +174,7 @@ The server is the central orchestration hub, implementing a Ports & Adapters (He
 │               ▼              ▼                               ▼            │
 │        ┌──────────┐   ┌──────────┐                   ┌──────────┐        │
 │        │ML Service│   │ Gemini   │                   │  Agent   │        │
-│        │ :8081    │   │ API      │                   │  :7070   │        │
+│        │ :8081    │   │ API      │                   │  :8082   │        │
 │        └──────────┘   └──────────┘                   └──────────┘        │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -460,7 +460,7 @@ The 594-dimensional feature vector is computed from each 5-second syscall window
 │                                   ▼                                         │
 │  ┌─────────────┐          ┌───────────────────┐          ┌───────────────┐ │
 │  │   Agent     │─────────▶│    Server         │◀────────▶│  ML Service   │ │
-│  │   :7070     │  HTTP    │    :9090          │  HTTP    │  :8081        │ │
+│  │   :8082     │  HTTP    │    :9090          │  HTTP    │  :8081        │ │
 │  │   (inbound) │          │                   │          │               │ │
 │  └──────┬──────┘          └─────────┬─────────┘          └───────────────┘ │
 │         │                           │                                       │
@@ -487,7 +487,7 @@ Port Summary:
 │ Service  │ Port    │ Purpose                                              │
 ├──────────┼─────────┼──────────────────────────────────────────────────────┤
 │ Server   │ 9090    │ REST API + WebSocket for agent & frontend           │
-│ Agent    │ 7070    │ HTTP server for commands from server                 │
+│ Agent    │ 8082    │ HTTP server for commands from server                 │
 │ ML Svc   │ 8081    │ Isolation Forest scoring & training                 │
 │ Frontend │ 5173    │ React dev server (Vite)                             │
 └──────────┴─────────┴──────────────────────────────────────────────────────┘
@@ -505,7 +505,7 @@ Port Summary:
 |----------|---------|-------------|
 | `DK_AGENT_ID` | `node-1` | Agent identifier |
 | `DK_SERVER_URL` | `http://localhost:9090` | Server URL |
-| `DK_AGENT_PORT` | `7070` | Agent HTTP server port |
+| `DK_AGENT_PORT` | `8082` | Agent HTTP server port |
 | `DK_SHORT_WINDOW_SEC` | `5` | Window duration |
 | `DK_DOCKER_SOCKET` | `/var/run/docker.sock` | Docker socket path |
 | `DK_CONTAINER_FILTER` | `.*` | Regex to filter containers |
@@ -520,7 +520,7 @@ server:
 
 deepkernel:
   agent:
-    base-url: http://localhost:7070
+    base-url: http://localhost:8082
   anomaly:
     mode: HYBRID  # LOCAL | REMOTE | HYBRID
   ml-service:

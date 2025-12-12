@@ -8,16 +8,16 @@ services:
       - MODE=${MODE:-normal}
       - EXFIL_URL=${EXFIL_URL:-https://example.com:4444/steal}
       - PAYMENTS_URL=${PAYMENTS_URL:-http://payments-internal:8080/reconcile}
+    ports:
+      - "8000:8000"
     networks:
       - bachat
-    expose:
-      - "8000"
 
   frontend:
     build:
       context: ./frontend
     environment:
-      - VITE_BACKEND_URL=http://backend:8000
+      - VITE_BACKEND_URL=${VITE_BACKEND_URL:-http://13.204.239.189:8000}
     ports:
       - "3000:3000"
     depends_on:

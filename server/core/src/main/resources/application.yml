@@ -10,11 +10,11 @@ spring:
 deepkernel:
   feature-version: v1
   agent:
-    base-url: http://localhost:7070
+    base-url: http://localhost:8082
   ui:
     origin: http://localhost:5173
   ws:
-    allowed-origins: http://localhost:5173,http://localhost:3000
+    allowed-origins: http://localhost:5173,http://localhost:3000,http://13.204.239.189:5173
   gemini:
     api-key: ${GEMINI_API_KEY:}
     model: gemini-pro

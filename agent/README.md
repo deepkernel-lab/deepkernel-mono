@@ -70,7 +70,7 @@ sudo ./deepkernel-agent
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DK_AGENT_ID` | `node-1` | Unique identifier for this agent |
-| `DK_SERVER_URL` | `http://localhost:8080` | DeepKernel server URL |
+| `DK_SERVER_URL` | `http://localhost:9090` | DeepKernel server URL |
 | `DK_NODE_NAME` | `worker-01` | Kubernetes node name |
 | `DK_SHORT_WINDOW_SEC` | `5` | Short window duration (seconds) |
 | `DK_MIN_EVENTS_PER_WINDOW` | `20` | Minimum events to trigger window send |
@@ -80,7 +80,7 @@ sudo ./deepkernel-agent
 | `DK_AUTO_BASELINE_DUMP` | `0` | Auto-start baseline dump (0=no, 1=yes) |
 | `DK_DOCKER_SOCKET` | `/var/run/docker.sock` | Docker socket path |
 | `DK_CONTAINER_CACHE_TTL` | `60` | Container name cache TTL (seconds) |
-| `DK_AGENT_LISTEN_PORT` | `8081` | HTTP server port for commands |
+| `DK_AGENT_LISTEN_PORT` | `8082` | HTTP server port for commands |
 | `DK_CONTAINER_FILTER` | `` | Regex to filter containers (empty=all) |
 | `DK_POLICY_DIR` | `/var/lib/deepkernel/policies` | Directory for policy files |
 | `DK_POLICY_ENFORCEMENT_MODE` | `ERRNO` | Policy action: `ERRNO` (block) or `LOG` (audit only) |
@@ -89,7 +89,7 @@ sudo ./deepkernel-agent
 
 ```bash
 export DK_AGENT_ID="demo-agent"
-export DK_SERVER_URL="http://localhost:8080"
+export DK_SERVER_URL="http://localhost:9090"
 export DK_CONTAINER_FILTER="bachat"
 export DK_DUMP_DIR="./dumps"
 export DK_POLICY_DIR="./policies"
@@ -218,7 +218,7 @@ Failed to POST window for container
 ```
 
 **Solutions:**
-1. Verify server URL: `curl http://localhost:8080/health`
+1. Verify server URL: `curl http://localhost:9090/health`
 2. Check network connectivity
 3. Review `DK_MIN_EVENTS_PER_WINDOW` setting
 

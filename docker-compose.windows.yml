@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # DeepKernel Core Components
+  # ---------------------------------------------------------------------------
+  
+  server:
+    build: 
+      context: ./server
+      dockerfile: Dockerfile
+    image: deepkernel-server:latest
+    ports:
+      - "9090:9090"
+      - "8443:8443"
+    environment:
+      - DEEPKERNEL_WS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+      - ANOMALY_ENGINE_MODE=IN_PROCESS
+    networks:
+      - deepkernel-net
+
+  ui:
+    build:
+      context: ./server/ui-frontend
+      dockerfile: Dockerfile
+    image: deepkernel-ui:latest
+    ports:
+      - "5173:80"  # Nginx serving the build
+    depends_on:
+      - server
+    networks:
+      - deepkernel-net
+
+  agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    image: deepkernel-agent:latest
+    privileged: true  # REQUIRED for eBPF
+    pid: "host"       # REQUIRED to see other processes
+    volumes:
+      - /sys/kernel/debug:/sys/kernel/debug:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DK_SERVER_URL=http://server:9090
+      - DK_CONTAINER_FILTER=bachat
+      - DK_AGENT_ID=docker-desktop-agent
+    networks:
+      - deepkernel-net
+    depends_on:
+      - server
+
+  # ---------------------------------------------------------------------------
+  # Demo App: Bachat Bank
+  # ---------------------------------------------------------------------------
+
+  bachat-backend:
+    build: ./demo-apps/bachat-bank/backend
+    image: bachat-backend:latest
+    environment:
+      - MODE=normal
+    ports:
+      - "8000:8000"
+    networks:
+      - deepkernel-net
+
+  bachat-frontend:
+    build:
+      context: ./demo-apps/bachat-bank/frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_BACKEND_URL: http://localhost:8000
+    image: bachat-frontend:latest
+    ports:
+      - "3000:3000"
+    depends_on:
+      - bachat-backend
+    networks:
+      - deepkernel-net
+
+networks:
+  deepkernel-net:
+    driver: bridge
+

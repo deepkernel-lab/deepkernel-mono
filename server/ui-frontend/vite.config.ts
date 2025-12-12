@@ -4,7 +4,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  root: 'public',
+  // root: 'public',  <-- Removed
   resolve: {
     alias: {
       '@src': path.resolve(__dirname, './src'),
@@ -15,6 +15,11 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
     include: ['../src/**/*.test.ts'],
+  },
+  server: {
+      host: true, // bind to 0.0.0.0
+      port: 5173,
+      strictPort: true,
   },
 });
 

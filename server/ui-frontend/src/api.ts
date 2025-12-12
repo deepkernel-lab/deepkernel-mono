@@ -1,6 +1,6 @@
 import { AnomalyEvent, Container, ModelVersion } from './types';
 
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://13.204.239.189:9090';
 
 async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(API_BASE + path);

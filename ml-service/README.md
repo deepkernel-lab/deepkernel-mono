@@ -224,6 +224,37 @@ docker run -p 8081:8081 \
   deepkernel-ml-service:latest
 ```
 
+## Training Tools
+
+The `tools/` directory contains utilities for training models:
+
+### From Agent Binary Dump
+
+When the agent collects a long dump (baseline recording), use:
+
+```bash
+python tools/train_from_dump.py /var/deepkernel/dumps/backend.bin \
+    --container-id bachat-backend \
+    --window-sec 5 \
+    --min-records 20
+```
+
+Options:
+- `--window-sec`: Window duration (default: 5 seconds)
+- `--min-records`: Minimum syscalls per window (default: 20)
+- `--dry-run`: Analyze dump without training
+- `-v`: Verbose output
+
+### Synthetic Baseline (Demo/Testing)
+
+For quick demos without real syscall data:
+
+```bash
+python tools/train_baseline.py --container-id bachat-backend --samples 100
+```
+
+This generates synthetic feature vectors that mimic normal web application behavior.
+
 ## Architecture
 
 ```
@@ -235,6 +266,9 @@ ml-service/
 │   └── models/
 │       ├── isolation_forest.py  # IsolationForest wrapper
 │       └── model_registry.py    # Per-container model storage
+├── tools/
+│   ├── train_from_dump.py   # Train from agent binary dumps
+│   └── train_baseline.py    # Synthetic baseline training
 ├── tests/
 │   ├── test_health.py
 │   ├── test_score.py

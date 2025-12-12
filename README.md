@@ -81,7 +81,7 @@ uvicorn src.main:app --reload --port 8081
 cd server
 ./gradlew :core:bootRun
 # Optional env:
-#   DEEPKERNEL_AGENT_BASE_URL=http://localhost:8080
+#   DEEPKERNEL_AGENT_BASE_URL=http://localhost:8082
 #   DEEPKERNEL_WS_ALLOWED_ORIGINS=http://localhost:5173
 #   DEEPKERNEL_UI_ORIGIN=http://localhost:5173
 ```
