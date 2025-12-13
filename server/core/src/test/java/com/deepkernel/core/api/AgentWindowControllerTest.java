@@ -60,6 +60,7 @@ class AgentWindowControllerTest {
         policyRepository = new PolicyRepository();
         eventRepository = new EventRepository();
         containerRepository = new ContainerRepository();
+        TrainingService trainingService = mock(TrainingService.class);
         controller = new AgentWindowController(
                 anomalyDetectionPort,
                 featureExtractor,
@@ -72,7 +73,8 @@ class AgentWindowControllerTest {
                 triageResultRepository,
                 policyRepository,
                 eventRepository,
-                containerRepository
+                containerRepository,
+                trainingService
         );
     }
 

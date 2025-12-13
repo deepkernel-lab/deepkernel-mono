@@ -34,21 +34,32 @@ public:
         std::string podName;      // Kubernetes pod name (if applicable)
         std::string podNamespace; // Kubernetes namespace (if applicable)
         std::string image;        // Container image
-        Runtime runtime;          // Detected runtime
+        Runtime runtime = Runtime::UNKNOWN;  // Detected runtime
     };
 
     // Configuration
     struct Config {
-        std::string dockerSocket = "/var/run/docker.sock";
-        std::string containerdSocket = "/run/containerd/containerd.sock";
-        std::string crioSocket = "/var/run/crio/crio.sock";
-        std::string crictlPath = "/usr/bin/crictl";
-        int cacheTTLSeconds = 60;
-        bool enableKubernetesApi = true;  // Query K8s API for pod info
-        bool preferPodName = true;        // Return pod name instead of container name
+        std::string dockerSocket;
+        std::string containerdSocket;
+        std::string crioSocket;
+        std::string crictlPath;
+        int cacheTTLSeconds;
+        bool enableKubernetesApi;
+        bool preferPodName;
+        
+        // Default constructor with default values
+        Config() 
+            : dockerSocket("/var/run/docker.sock")
+            , containerdSocket("/run/containerd/containerd.sock")
+            , crioSocket("/var/run/crio/crio.sock")
+            , crictlPath("/usr/bin/crictl")
+            , cacheTTLSeconds(60)
+            , enableKubernetesApi(true)
+            , preferPodName(true)
+        {}
     };
 
-    explicit ContainerMapper(const Config& config = Config{});
+    explicit ContainerMapper(const Config& config = Config());
 
     /**
      * Get container name for a given cgroup ID and PID.
@@ -97,7 +108,7 @@ private:
     struct CgroupInfo {
         std::string containerId;
         std::string podUid;      // Kubernetes pod UID if present
-        Runtime runtime;
+        Runtime runtime = Runtime::UNKNOWN;
     };
     CgroupInfo parseCgroup(uint32_t pid);
 
@@ -109,9 +120,6 @@ private:
 
     // Helper: Query via crictl (works with containerd and CRI-O)
     std::optional<ContainerInfo> queryCrictl(const std::string& containerId);
-
-    // Helper: Read Kubernetes pod info from downward API
-    std::optional<ContainerInfo> readKubernetesDownwardApi();
 
     // HTTP helpers
     std::string httpGetUnixSocket(const std::string& socketPath, const std::string& path);

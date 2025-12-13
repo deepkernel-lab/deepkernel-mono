@@ -157,15 +157,15 @@ std::optional<ContainerMapper::ContainerInfo> ContainerMapper::getContainerInfo(
     
     if (!info) {
         // Return basic info with just the ID
-        info = ContainerInfo{
-            .id = cgroup.containerId.substr(0, 12),
-            .fullId = cgroup.containerId,
-            .name = cgroup.containerId.substr(0, 12),
-            .podName = "",
-            .podNamespace = "",
-            .image = "",
-            .runtime = cgroup.runtime
-        };
+        ContainerInfo basicInfo;
+        basicInfo.id = cgroup.containerId.substr(0, 12);
+        basicInfo.fullId = cgroup.containerId;
+        basicInfo.name = cgroup.containerId.substr(0, 12);
+        basicInfo.podName = "";
+        basicInfo.podNamespace = "";
+        basicInfo.image = "";
+        basicInfo.runtime = cgroup.runtime;
+        info = basicInfo;
     }
     
     // Cache result
