@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.function.BooleanSupplier;
 
 /**
  * Triage adapter that uses Google Gemini API for intelligent anomaly triage.
@@ -30,32 +29,31 @@ public class GeminiTriageAdapter implements TriagePort {
     
     private static final String GEMINI_URL_TEMPLATE_V1BETA =
         "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s";
+    private static final String GEMINI_URL_TEMPLATE_V1 =
+        "https://generativelanguage.googleapis.com/v1/models/%s:generateContent?key=%s";
     
     private final String apiKey;
     private final String model;
-    private final boolean defaultEnableLlm;
-    private final BooleanSupplier enableSupplier;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     
+    public GeminiTriageAdapter() {
+        this(System.getenv("GEMINI_API_KEY"), "gemini-pro");
+    }
+    
     public GeminiTriageAdapter(
             @Value("${deepkernel.gemini.api-key:}") String apiKey,
-            @Value("${deepkernel.gemini.model:gemini-1.5-flash}") String model,
-            @Value("${deepkernel.triage.enable-llm:false}") boolean enableLlm,
-            BooleanSupplier enableSupplier) {
+            @Value("${deepkernel.gemini.model:gemini-pro}") String model) {
         this.apiKey = apiKey;
         this.model = model;
-        this.defaultEnableLlm = enableLlm;
-        this.enableSupplier = enableSupplier;
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
     }
     
     @Override
     public TriageResult triage(AnomalyWindow window, ChangeContext changeContext) {
-        boolean llmEnabled = enableSupplier != null ? enableSupplier.getAsBoolean() : defaultEnableLlm;
-        // If disabled or missing API key, skip LLM
-        if (llmEnabled && apiKey != null && !apiKey.isBlank()) {
+        // If API key is configured, try LLM triage
+        if (apiKey != null && !apiKey.isBlank()) {
             try {
                 return triageWithGemini(window, changeContext);
             } catch (Exception e) {
@@ -70,6 +68,7 @@ public class GeminiTriageAdapter implements TriagePort {
     private TriageResult triageWithGemini(AnomalyWindow window, ChangeContext changeContext) {
         String prompt = buildPrompt(window, changeContext);
         String urlV1beta = String.format(GEMINI_URL_TEMPLATE_V1BETA, model, apiKey);
+        String urlV1 = String.format(GEMINI_URL_TEMPLATE_V1, model, apiKey);
         
         Map<String, Object> requestBody = Map.of(
             "contents", List.of(Map.of(
@@ -85,7 +84,13 @@ public class GeminiTriageAdapter implements TriagePort {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
         
-        String response = restTemplate.postForObject(urlV1beta, entity, String.class);
+        String response;
+        try {
+            response = restTemplate.postForObject(urlV1beta, entity, String.class);
+        } catch (Exception v1betaErr) {
+            log.debug("Gemini v1beta call failed (will retry v1): {}", v1betaErr.getMessage());
+            response = restTemplate.postForObject(urlV1, entity, String.class);
+        }
         log.debug("Gemini response: {}", response);
         
         return parseGeminiResponse(window, response);

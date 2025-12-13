@@ -25,7 +25,6 @@ import com.deepkernel.core.repo.PolicyRepository;
 import com.deepkernel.core.repo.TriageResultRepository;
 import com.deepkernel.core.service.FeatureExtractor;
 import com.deepkernel.core.service.SyscallWindowSummarizer;
-import com.deepkernel.core.service.TrainingService;
 import com.deepkernel.core.service.model.LiveEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +57,6 @@ public class AgentWindowController {
     private final PolicyRepository policyRepository;
     private final EventRepository eventRepository;
     private final ContainerRepository containerRepository;
-    private final TrainingService trainingService;
     private final SyscallWindowSummarizer syscallWindowSummarizer = new SyscallWindowSummarizer();
 
     public AgentWindowController(AnomalyDetectionPort anomalyDetectionPort,
@@ -72,8 +70,7 @@ public class AgentWindowController {
                                  TriageResultRepository triageResultRepository,
                                  PolicyRepository policyRepository,
                                  EventRepository eventRepository,
-                                 ContainerRepository containerRepository,
-                                 TrainingService trainingService) {
+                                 ContainerRepository containerRepository) {
         this.anomalyDetectionPort = anomalyDetectionPort;
         this.featureExtractor = featureExtractor;
         this.messagingTemplate = messagingTemplate;
@@ -86,7 +83,6 @@ public class AgentWindowController {
         this.policyRepository = policyRepository;
         this.eventRepository = eventRepository;
         this.containerRepository = containerRepository;
-        this.trainingService = trainingService;
     }
 
     @PostMapping("/windows")
@@ -261,7 +257,10 @@ public class AgentWindowController {
         messagingTemplate.convertAndSend("/topic/events", dumpEvent);
         
         // TODO: Trigger training pipeline
-        trainingService.handleDumpComplete(completion);
+        // 1. Read binary dump file from completion.dumpPath()
+        // 2. Parse trace records
+        // 3. Extract feature vectors
+        // 4. Train/retrain model for container
         
         return ResponseEntity.ok(Map.of(
             "status", "received",

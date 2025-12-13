@@ -4,7 +4,6 @@ import com.deepkernel.contracts.model.Container;
 import com.deepkernel.core.repo.ContainerRepository;
 import com.deepkernel.core.repo.EventRepository;
 import com.deepkernel.core.service.ModelRegistryService;
-import com.deepkernel.core.service.TriageToggleService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,16 +23,13 @@ public class AdminController {
     private final ContainerRepository containerRepository;
     private final EventRepository eventRepository;
     private final ModelRegistryService modelRegistryService;
-    private final TriageToggleService triageToggleService;
 
     public AdminController(ContainerRepository containerRepository, 
                           EventRepository eventRepository,
-                          ModelRegistryService modelRegistryService,
-                          TriageToggleService triageToggleService) {
+                          ModelRegistryService modelRegistryService) {
         this.containerRepository = containerRepository;
         this.eventRepository = eventRepository;
         this.modelRegistryService = modelRegistryService;
-        this.triageToggleService = triageToggleService;
     }
 
     /**
@@ -144,26 +140,6 @@ public class AdminController {
         modelRegistryService.clearCache();
         return ResponseEntity.ok(Map.of(
             "status", "cleared"
-        ));
-    }
-
-    /**
-     * Get or set triage LLM enable flag (demo safety).
-     */
-    @GetMapping("/triage/enabled")
-    public ResponseEntity<Map<String, Object>> getTriageEnabled() {
-        return ResponseEntity.ok(Map.of(
-                "enableLlm", triageToggleService.isEnabled()
-        ));
-    }
-
-    @PostMapping("/triage/enabled")
-    public ResponseEntity<Map<String, Object>> setTriageEnabled(@RequestBody Map<String, Object> body) {
-        Object enabledVal = body.get("enableLlm");
-        boolean enabled = enabledVal instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(enabledVal));
-        triageToggleService.setEnabled(enabled);
-        return ResponseEntity.ok(Map.of(
-                "enableLlm", enabled
         ));
     }
 }

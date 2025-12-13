@@ -61,34 +61,6 @@ public class ModelRegistryService {
         versions.computeIfAbsent(containerId, k -> new CopyOnWriteArrayList<>()).add(mv);
         log.info("Updated model registry for {}: version={}, status={}", containerId, version, status);
     }
-
-    public void setStatus(String containerId, int version, ModelStatus status) {
-        List<ModelVersion> list = versions.get(containerId);
-        if (list == null || list.isEmpty()) return;
-        ModelVersion latest = list.get(list.size() - 1);
-        if (latest.version() != version) return;
-        ModelVersion updated = new ModelVersion(
-                latest.modelId(),
-                latest.containerId(),
-                latest.version(),
-                latest.featureVersion(),
-                latest.trainedAt(),
-                status,
-                latest.metrics()
-        );
-        list.set(list.size() - 1, updated);
-        log.info("Set model status for {} v{} -> {}", containerId, version, status);
-    }
-
-    public void removeLatest(String containerId) {
-        List<ModelVersion> list = versions.get(containerId);
-        if (list == null || list.isEmpty()) return;
-        list.remove(list.size() - 1);
-        if (list.isEmpty()) {
-            versions.remove(containerId);
-        }
-        log.info("Removed latest model entry for {}", containerId);
-    }
     
     /**
      * Sync model status from ML service for all known containers.

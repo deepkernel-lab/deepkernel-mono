@@ -16,7 +16,6 @@ import com.deepkernel.core.repo.EventRepository;
 import com.deepkernel.core.repo.PolicyRepository;
 import com.deepkernel.core.repo.TriageResultRepository;
 import com.deepkernel.core.service.FeatureExtractor;
-import com.deepkernel.core.service.TrainingService;
 import com.deepkernel.core.service.model.LiveEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,7 +60,6 @@ class AgentWindowControllerTest {
         policyRepository = new PolicyRepository();
         eventRepository = new EventRepository();
         containerRepository = new ContainerRepository();
-        TrainingService trainingService = mock(TrainingService.class);
         controller = new AgentWindowController(
                 anomalyDetectionPort,
                 featureExtractor,
@@ -74,8 +72,7 @@ class AgentWindowControllerTest {
                 triageResultRepository,
                 policyRepository,
                 eventRepository,
-                containerRepository,
-                trainingService
+                containerRepository
         );
     }
 
