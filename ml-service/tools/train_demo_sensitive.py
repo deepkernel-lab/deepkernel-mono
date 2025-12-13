@@ -290,19 +290,41 @@ def test_sensitivity(container_id: str, ml_service_url: str, profile: str = "pyt
     print("Testing model sensitivity...")
     print()
     
-    # Generate normal pattern (should be safe)
+    # Generate normal pattern - EXACT same method as training (should be SAFE)
     normal = generate_tight_baseline(profile, 1)[0]
     
-    # Generate anomalous pattern (different distribution)
+    # Generate TRULY anomalous pattern - completely different structure
+    # The key is to have DIFFERENT non-zero positions in the Markov matrix
     anomalous = [0.0] * 594
-    anomalous[IDX_FILE_RATIO] = 0.1   # Low file (was 0.45)
-    anomalous[IDX_NET_RATIO] = 0.6    # High network (was 0.25)
-    anomalous[IDX_PROC_RATIO] = 0.2   # Higher proc
-    anomalous[IDX_ENTROPY] = 3.5      # Higher entropy
-    anomalous[IDX_UNIQUE_TWO_GRAMS] = 50  # More unique transitions
+    
+    # Fill DIFFERENT Markov cells than normal (use process-heavy pattern)
+    # Normal uses FILE-FILE, FILE-NET transitions
+    # Anomalous uses PROC-PROC, MEM-MEM, OTHER-OTHER (positions 15*24+15, 20*24+20, etc.)
+    anomalous[15*24 + 15] = 0.4  # PROC -> PROC (unusual loop)
+    anomalous[15*24 + 18] = 0.2  # PROC -> PROC variant
+    anomalous[20*24 + 20] = 0.3  # MEM -> MEM (memory heavy)
+    anomalous[0*24 + 15] = 0.2   # OTHER -> PROC
+    anomalous[15*24 + 0] = 0.1   # PROC -> OTHER
+    
+    # Inverted class ratios (opposite of normal)
+    anomalous[IDX_FILE_RATIO] = 0.05   # Very low file (normal: 0.45)
+    anomalous[IDX_NET_RATIO] = 0.10    # Low network (normal: 0.25)
+    anomalous[IDX_PROC_RATIO] = 0.50   # Very high proc (normal: 0.10)
+    anomalous[IDX_MEM_RATIO] = 0.25    # High memory (normal: 0.05)
+    anomalous[IDX_OTHER_RATIO] = 0.10  # Different
+    
+    # Very different entropy and transitions
+    anomalous[IDX_ENTROPY] = 4.5       # High chaos (normal: ~2.0)
+    anomalous[IDX_UNIQUE_TWO_GRAMS] = 80  # Many unique (normal: ~15)
+    anomalous[IDX_TOTAL_SYSCALLS] = 2000  # High volume
+    anomalous[IDX_DURATION] = 5.0
+    anomalous[IDX_MEAN_INTER] = 2500   # Fast (normal: ~10000)
     
     print(f"Testing against model: {container_id}")
-    for name, fv in [("Normal pattern", normal), ("Anomalous pattern", anomalous)]:
+    print()
+    
+    results = []
+    for name, fv in [("Normal (same as training)", normal), ("Anomalous (different structure)", anomalous)]:
         response = requests.post(
             f"{ml_service_url}/api/ml/score",
             json={"container_id": container_id, "feature_vector": fv}
@@ -310,9 +332,57 @@ def test_sensitivity(container_id: str, ml_service_url: str, profile: str = "pyt
         if response.status_code == 200:
             result = response.json()
             status = "THREAT" if result["anomalous"] else "SAFE"
-            print(f"  {name}: score={result['score']:.4f} -> {status}")
+            print(f"  {name}:")
+            print(f"    Score: {result['score']:.4f} -> {status}")
+            results.append((name, result['score'], result['anomalous']))
         else:
             print(f"  {name}: Error - {response.text}")
+    
+    # Check if results make sense
+    if len(results) == 2:
+        normal_score, anomalous_score = results[0][1], results[1][1]
+        if normal_score < anomalous_score:
+            print()
+            print("  WARNING: Normal scored MORE anomalous than Anomalous!")
+            print("  This suggests the model baseline doesn't match test patterns.")
+            print("  The model may need different training data.")
+
+
+def analyze_training_data(training_data: List[List[float]]):
+    """Print statistics about the training data to understand what the model learned."""
+    print("\nTraining Data Analysis:")
+    print("-" * 40)
+    
+    if not training_data:
+        print("  No training data!")
+        return
+    
+    # Compute mean values for key features
+    arr = np.array(training_data)
+    
+    print(f"  Samples: {len(training_data)}")
+    print(f"  Dimensions: {len(training_data[0])}")
+    print()
+    print("  Mean feature values:")
+    print(f"    FILE ratio:   {np.mean(arr[:, IDX_FILE_RATIO]):.4f}")
+    print(f"    NET ratio:    {np.mean(arr[:, IDX_NET_RATIO]):.4f}")
+    print(f"    PROC ratio:   {np.mean(arr[:, IDX_PROC_RATIO]):.4f}")
+    print(f"    MEM ratio:    {np.mean(arr[:, IDX_MEM_RATIO]):.4f}")
+    print(f"    OTHER ratio:  {np.mean(arr[:, IDX_OTHER_RATIO]):.4f}")
+    print(f"    Entropy:      {np.mean(arr[:, IDX_ENTROPY]):.4f}")
+    print(f"    Unique trans: {np.mean(arr[:, IDX_UNIQUE_TWO_GRAMS]):.1f}")
+    print()
+    
+    # Count non-zero Markov cells
+    markov = arr[:, :576]
+    nonzero_cells = np.sum(markov > 0.01, axis=1).mean()
+    print(f"  Avg non-zero Markov cells: {nonzero_cells:.1f} / 576")
+    
+    # Find which Markov cells are commonly used
+    cell_usage = np.mean(markov > 0.01, axis=0)
+    top_cells = np.argsort(cell_usage)[-5:][::-1]
+    print(f"  Most used Markov cells: {list(top_cells)}")
+    print("-" * 40)
 
 
 def main():
@@ -350,6 +420,11 @@ def main():
         default=50,
         help="Number of training samples (fewer = more sensitive, default: 50)"
     )
+    parser.add_argument(
+        "--analyze-only", "-a",
+        action="store_true",
+        help="Only analyze training data, don't train"
+    )
     
     args = parser.parse_args()
     
@@ -380,6 +455,13 @@ def main():
         parser.error("Either --dump-file or --synthetic is required")
     
     print(f"Training data: {len(training_data)} samples, {len(training_data[0])} dimensions")
+    
+    # Analyze training data
+    analyze_training_data(training_data)
+    
+    if args.analyze_only:
+        print("\n--analyze-only specified, skipping training.")
+        return
     
     # Train the TEST model (doesn't affect original)
     result, test_container_id = train_model(args.container, training_data, args.ml_service)
