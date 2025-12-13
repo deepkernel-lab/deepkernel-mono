@@ -1,6 +1,7 @@
 #include "config.h"
 
 #include <cstdlib>
+#include <iostream>
 
 namespace {
 std::string envOrDefault(const char* key, const std::string& fallback) {
@@ -15,6 +16,15 @@ int envOrDefaultInt(const char* key, int fallback) {
     const char* val = std::getenv(key);
     if (val && *val) {
         return std::atoi(val);
+    }
+    return fallback;
+}
+
+bool envOrDefaultBool(const char* key, bool fallback) {
+    const char* val = std::getenv(key);
+    if (val && *val) {
+        std::string s(val);
+        return s == "1" || s == "true" || s == "yes" || s == "on";
     }
     return fallback;
 }
@@ -38,11 +48,20 @@ AgentConfig loadConfig() {
         envOrDefaultInt("DK_LONG_DUMP_DURATION_SEC", cfg.longDumpDefaultDurationSec);
     cfg.dumpDir = envOrDefault("DK_DUMP_DIR", cfg.dumpDir);
     cfg.syscallVocabSize = envOrDefaultInt("DK_SYSCALL_VOCAB_SIZE", cfg.syscallVocabSize);
-    cfg.autoBaselineDump = envOrDefaultInt("DK_AUTO_BASELINE_DUMP", cfg.autoBaselineDump ? 1 : 0) != 0;
+    cfg.autoBaselineDump = envOrDefaultBool("DK_AUTO_BASELINE_DUMP", cfg.autoBaselineDump);
 
-    // Docker integration
+    // Container runtime integration
+    // Supports: auto (default), docker, containerd, crio
+    cfg.containerRuntime = envOrDefault("DK_CONTAINER_RUNTIME", cfg.containerRuntime);
     cfg.dockerSocketPath = envOrDefault("DK_DOCKER_SOCKET", cfg.dockerSocketPath);
+    cfg.containerdSocketPath = envOrDefault("DK_CONTAINERD_SOCKET", cfg.containerdSocketPath);
+    cfg.crioSocketPath = envOrDefault("DK_CRIO_SOCKET", cfg.crioSocketPath);
+    cfg.crictlPath = envOrDefault("DK_CRICTL_PATH", cfg.crictlPath);
     cfg.containerMapCacheTTL = envOrDefaultInt("DK_CONTAINER_CACHE_TTL", cfg.containerMapCacheTTL);
+
+    // Kubernetes settings
+    cfg.enableKubernetesApi = envOrDefaultBool("DK_ENABLE_K8S_API", cfg.enableKubernetesApi);
+    cfg.preferPodName = envOrDefaultBool("DK_PREFER_POD_NAME", cfg.preferPodName);
 
     // Agent HTTP server
     cfg.agentListenPort = envOrDefaultInt("DK_AGENT_LISTEN_PORT", cfg.agentListenPort);

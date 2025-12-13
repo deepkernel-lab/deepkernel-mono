@@ -29,6 +29,7 @@ add_executable(deepkernel-agent
     src/agent.cpp
     src/agent_server.cpp
     src/config.cpp
+    src/container_mapper.cpp
     src/docker_mapper.cpp
     src/http_client.cpp
     src/policy_enforcer.cpp
@@ -70,10 +71,12 @@ enable_testing()
 
 add_executable(agent-tests
     src/serialization.cpp
+    src/container_mapper.cpp
     src/docker_mapper.cpp
     src/policy_enforcer.cpp
     src/http_client.cpp
     tests/serialization_tests.cpp
+    tests/container_mapper_tests.cpp
     tests/docker_mapper_tests.cpp
     tests/policy_enforcer_tests.cpp
 )

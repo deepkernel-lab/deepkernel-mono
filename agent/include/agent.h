@@ -10,7 +10,7 @@
 #include "agent_server.h"
 #include "buffer_manager.h"
 #include "config.h"
-#include "docker_mapper.h"
+#include "container_mapper.h"
 #include "event_types.h"
 #include "http_client.h"
 
@@ -28,7 +28,7 @@ public:
 private:
     AgentConfig config_;
     HttpClient http_;
-    DockerMapper dockerMapper_;
+    std::unique_ptr<ContainerMapper> containerMapper_;
     std::unique_ptr<AgentServer> server_;
     std::unique_ptr<PolicyEnforcer> policyEnforcer_;
     int bpf_fd_{-1};

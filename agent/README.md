@@ -5,7 +5,8 @@ The DeepKernel Agent is an eBPF-based syscall monitoring agent that captures per
 ## Features
 
 - **eBPF-based syscall capture** - Low overhead monitoring using kernel tracepoints
-- **Docker container mapping** - Automatically resolves Docker container names from cgroup IDs
+- **Multi-runtime container support** - Docker, containerd, CRI-O with automatic detection
+- **Kubernetes-native** - Pod name resolution, namespace awareness, downward API support
 - **Syscall classification** - Categorizes syscalls into FILE, NET, PROC, MEM, OTHER classes
 - **5-second window streaming** - Sends short windows to server for real-time analysis
 - **Long dump support** - Records extended traces for baseline training
@@ -17,7 +18,8 @@ The DeepKernel Agent is an eBPF-based syscall monitoring agent that captures per
 ### System Requirements
 - Linux kernel 5.8+ (for ring buffer support)
 - Root/CAP_BPF privileges for eBPF operations
-- Docker installed (for container monitoring)
+- Container runtime: Docker, containerd, or CRI-O
+- For Kubernetes: `crictl` CLI tool (for containerd/CRI-O name resolution)
 
 ### Build Dependencies
 
@@ -67,6 +69,8 @@ sudo ./deepkernel-agent
 
 ### Environment Variables
 
+#### Basic Configuration
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DK_AGENT_ID` | `node-1` | Unique identifier for this agent |
@@ -78,10 +82,31 @@ sudo ./deepkernel-agent
 | `DK_DUMP_DIR` | `/var/lib/deepkernel/dumps` | Directory for dump files |
 | `DK_SYSCALL_VOCAB_SIZE` | `256` | Syscall vocabulary size |
 | `DK_AUTO_BASELINE_DUMP` | `0` | Auto-start baseline dump (0=no, 1=yes) |
-| `DK_DOCKER_SOCKET` | `/var/run/docker.sock` | Docker socket path |
-| `DK_CONTAINER_CACHE_TTL` | `60` | Container name cache TTL (seconds) |
 | `DK_AGENT_LISTEN_PORT` | `8082` | HTTP server port for commands |
 | `DK_CONTAINER_FILTER` | `` | Regex to filter containers (empty=all) |
+
+#### Container Runtime Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DK_CONTAINER_RUNTIME` | `auto` | Runtime: `auto`, `docker`, `containerd`, `crio` |
+| `DK_DOCKER_SOCKET` | `/var/run/docker.sock` | Docker socket path |
+| `DK_CONTAINERD_SOCKET` | `/run/containerd/containerd.sock` | Containerd socket path |
+| `DK_CRIO_SOCKET` | `/var/run/crio/crio.sock` | CRI-O socket path |
+| `DK_CRICTL_PATH` | `/usr/bin/crictl` | Path to crictl binary |
+| `DK_CONTAINER_CACHE_TTL` | `60` | Container name cache TTL (seconds) |
+
+#### Kubernetes Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DK_ENABLE_K8S_API` | `true` | Query Kubernetes API for pod metadata |
+| `DK_PREFER_POD_NAME` | `true` | Use pod name instead of container name |
+
+#### Policy Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
 | `DK_POLICY_DIR` | `/var/lib/deepkernel/policies` | Directory for policy files |
 | `DK_POLICY_ENFORCEMENT_MODE` | `ERRNO` | Policy action: `ERRNO` (block) or `LOG` (audit only) |
 
@@ -112,23 +137,139 @@ sudo -E ./deepkernel-agent
 - Safe for testing without disruption
 - Check logs: `sudo ausearch -m SECCOMP`
 
-## Docker Permissions
+## Container Runtime Support
 
-To monitor Docker containers, the agent needs access to:
+The agent supports multiple container runtimes with automatic detection:
 
-1. **Docker socket** - For container name resolution
-   ```bash
-   # Ensure docker.sock is accessible
-   sudo chmod 666 /var/run/docker.sock
-   # OR add user to docker group
-   sudo usermod -aG docker $USER
-   ```
+### Docker (Default)
 
-2. **eBPF capabilities** - For attaching BPF programs
-   ```bash
-   # Run as root, or with capabilities:
-   sudo setcap cap_bpf,cap_perfmon,cap_sys_admin+ep ./deepkernel-agent
-   ```
+```bash
+# Ensure docker.sock is accessible
+sudo chmod 666 /var/run/docker.sock
+# OR add user to docker group
+sudo usermod -aG docker $USER
+
+# Run with Docker
+sudo ./deepkernel-agent
+```
+
+### Kubernetes with containerd
+
+For Kubernetes clusters using containerd (no Docker):
+
+```bash
+# Install crictl (required for containerd name resolution)
+VERSION="v1.28.0"
+curl -L "https://github.com/kubernetes-sigs/cri-tools/releases/download/${VERSION}/crictl-${VERSION}-linux-amd64.tar.gz" | \
+  sudo tar -C /usr/local/bin -xz
+
+# Configure crictl for containerd
+sudo crictl config --set runtime-endpoint=unix:///run/containerd/containerd.sock
+
+# Run agent with containerd
+export DK_CONTAINER_RUNTIME=containerd
+sudo -E ./deepkernel-agent
+```
+
+**Kubernetes DaemonSet deployment:**
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: deepkernel-agent
+  namespace: deepkernel
+spec:
+  selector:
+    matchLabels:
+      app: deepkernel-agent
+  template:
+    metadata:
+      labels:
+        app: deepkernel-agent
+    spec:
+      hostPID: true
+      hostNetwork: true
+      containers:
+      - name: agent
+        image: deepkernel/agent:latest
+        securityContext:
+          privileged: true
+        env:
+        - name: DK_CONTAINER_RUNTIME
+          value: "containerd"
+        - name: DK_ENABLE_K8S_API
+          value: "true"
+        - name: DK_PREFER_POD_NAME
+          value: "true"
+        - name: KUBERNETES_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - name: containerd-socket
+          mountPath: /run/containerd/containerd.sock
+        - name: sys
+          mountPath: /sys
+          readOnly: true
+        - name: proc
+          mountPath: /host/proc
+          readOnly: true
+      volumes:
+      - name: containerd-socket
+        hostPath:
+          path: /run/containerd/containerd.sock
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: proc
+        hostPath:
+          path: /proc
+```
+
+### CRI-O (OpenShift/Kubernetes)
+
+```bash
+# Run agent with CRI-O
+export DK_CONTAINER_RUNTIME=crio
+export DK_CRIO_SOCKET=/var/run/crio/crio.sock
+sudo -E ./deepkernel-agent
+```
+
+### Runtime Auto-Detection
+
+By default (`DK_CONTAINER_RUNTIME=auto`), the agent auto-detects the runtime:
+
+1. Check `/var/run/docker.sock` → Docker
+2. Check `/run/containerd/containerd.sock` → containerd
+3. Check `/var/run/crio/crio.sock` → CRI-O
+4. Fall back to crictl if available
+
+### Container Naming
+
+In Kubernetes environments, container names follow this format:
+
+| Setting | Example Container Name |
+|---------|----------------------|
+| `DK_PREFER_POD_NAME=true` (default) | `prod/payment-api` or `payment-api` |
+| `DK_PREFER_POD_NAME=false` | `k8s_payment-api_pod-xyz_prod_...` |
+
+## eBPF Capabilities
+
+For eBPF operations, run as root or with capabilities:
+
+```bash
+# Option 1: Run as root
+sudo ./deepkernel-agent
+
+# Option 2: Set capabilities
+sudo setcap cap_bpf,cap_perfmon,cap_sys_admin+ep ./deepkernel-agent
+./deepkernel-agent
+```
 
 ## API Reference
 

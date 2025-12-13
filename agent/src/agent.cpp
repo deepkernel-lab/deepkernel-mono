@@ -12,6 +12,7 @@
 
 #include <bpf/bpf.h>
 
+#include "container_mapper.h"
 #include "policy_enforcer.h"
 #include "serialization.h"
 
@@ -53,8 +54,20 @@ std::string sanitizeContainerId(const std::string& id) {
 
 Agent::Agent(AgentConfig config)
     : config_(std::move(config)),
-      dockerMapper_(config_.dockerSocketPath, config_.containerMapCacheTTL),
-      policyEnforcer_(std::make_unique<PolicyEnforcer>(config_.dockerSocketPath, config_.policyDir, config_.policyEnforcementMode)) {}
+      policyEnforcer_(std::make_unique<PolicyEnforcer>(config_.dockerSocketPath, config_.policyDir, config_.policyEnforcementMode)) {
+    
+    // Initialize container mapper with runtime-specific configuration
+    ContainerMapper::Config mapperConfig;
+    mapperConfig.dockerSocket = config_.dockerSocketPath;
+    mapperConfig.containerdSocket = config_.containerdSocketPath;
+    mapperConfig.crioSocket = config_.crioSocketPath;
+    mapperConfig.crictlPath = config_.crictlPath;
+    mapperConfig.cacheTTLSeconds = config_.containerMapCacheTTL;
+    mapperConfig.enableKubernetesApi = config_.enableKubernetesApi;
+    mapperConfig.preferPodName = config_.preferPodName;
+    
+    containerMapper_ = std::make_unique<ContainerMapper>(mapperConfig);
+}
 
 Agent::~Agent() {
     if (server_) {
@@ -244,10 +257,11 @@ void Agent::processShortWindow(ContainerBuffer& buffer) {
 }
 
 std::string Agent::mapContainerId(uint64_t cgroupId, uint32_t pid) {
-    // Try to resolve Docker container name from cgroup ID
-    std::string containerName = dockerMapper_.getContainerName(cgroupId, pid);
+    // Try to resolve container name from cgroup ID
+    // Works with Docker, containerd, CRI-O, and Kubernetes
+    std::string containerName = containerMapper_->getContainerName(cgroupId, pid);
     
-    // If Docker mapping found a name, use it; otherwise fall back to cgroup ID
+    // If mapping found a name, use it; otherwise fall back to cgroup ID
     if (!containerName.empty()) {
         return containerName;
     }

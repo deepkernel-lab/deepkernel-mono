@@ -19,9 +19,18 @@ struct AgentConfig {
     int syscallVocabSize{256};
     bool autoBaselineDump{false};
 
-    // Docker integration
+    // Container runtime integration
+    // Supports: docker, containerd, crio, auto (auto-detect)
+    std::string containerRuntime{"auto"};
     std::string dockerSocketPath{"/var/run/docker.sock"};
+    std::string containerdSocketPath{"/run/containerd/containerd.sock"};
+    std::string crioSocketPath{"/var/run/crio/crio.sock"};
+    std::string crictlPath{"/usr/bin/crictl"};
     int containerMapCacheTTL{60};  // seconds
+    
+    // Kubernetes settings
+    bool enableKubernetesApi{true};   // Query K8s API for pod metadata
+    bool preferPodName{true};         // Return pod name instead of container name
 
     // Agent HTTP server (for receiving commands from DeepKernel server)
     int agentListenPort{8082};
