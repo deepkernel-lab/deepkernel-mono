@@ -65,9 +65,14 @@ public class HttpAgentAdapter implements AgentControlPort {
         // Agent demo server endpoint is POST /policies (no path params)
         String url = baseUrl + "/policies";
         
+        String effectiveContainerId = (containerId == null || containerId.isBlank()) ? "unknown" : containerId;
+        String effectivePolicyId = (policy.id() == null || policy.id().isBlank())
+                ? java.util.UUID.randomUUID().toString()
+                : policy.id();
+
         Map<String, Object> body = new HashMap<>();
-        body.put("container_id", containerId);
-        body.put("policy_id", policy.id());
+        body.put("container_id", effectiveContainerId);
+        body.put("policy_id", effectivePolicyId);
         body.put("type", policy.type().name());
         body.put("spec", policy.spec());
         

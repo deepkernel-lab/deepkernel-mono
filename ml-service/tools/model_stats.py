@@ -63,25 +63,25 @@ def print_model_stats(stats: dict):
     print("="*60)
     
     # Basic info
-    print("\n📋 Basic Info:")
+    print("\n Basic Info:")
     print(f"   Model ID:       {stats.get('model_id')}")
     print(f"   Container:      {stats.get('container_id')}")
     print(f"   Version:        {stats.get('version')}")
     print(f"   Status:         {stats.get('status')}")
     
     # Training info
-    print("\n📊 Training Info:")
+    print("\n Training Info:")
     print(f"   Trained at:     {stats.get('trained_at') or 'Never'}")
     print(f"   Sample count:   {stats.get('sample_count') or 'N/A'}")
     
     # Model parameters
-    print("\n⚙️ Model Parameters:")
+    print("\n Model Parameters:")
     print(f"   n_estimators:   {stats.get('n_estimators')}")
     print(f"   contamination:  {stats.get('contamination')}")
     print(f"   max_samples:    {stats.get('max_samples')}")
     
     # Model internals
-    print("\n🔬 Model Internals:")
+    print("\n Model Internals:")
     offset = stats.get('offset')
     print(f"   Decision offset: {f'{offset:.4f}' if offset is not None else 'N/A'}")
     
@@ -91,12 +91,12 @@ def print_model_stats(stats: dict):
     print(f"   Feature importance std:  {f'{fi_std:.6f}' if fi_std is not None else 'N/A'}")
     
     # Scoring
-    print("\n🎯 Scoring Configuration:")
+    print("\n Scoring Configuration:")
     print(f"   Anomaly threshold: {stats.get('anomaly_threshold')}")
     print(f"   (scores < threshold are anomalous)")
     
     # Storage
-    print("\n💾 Storage:")
+    print("\n Storage:")
     print(f"   Model file: {stats.get('model_file_path') or 'Not persisted'}")
     print(f"   File size:  {format_bytes(stats.get('model_file_size_bytes'))}")
     
@@ -171,16 +171,16 @@ def main():
                 
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 404:
-            print(f"❌ No model found for container: {args.container_id}")
+            print(f" No model found for container: {args.container_id}")
         else:
-            print(f"❌ Error: {e.response.status_code} - {e.response.text}")
+            print(f" Error: {e.response.status_code} - {e.response.text}")
         sys.exit(1)
     except httpx.ConnectError:
-        print(f"❌ Cannot connect to ML service at {args.ml_service_url}")
+        print(f" Cannot connect to ML service at {args.ml_service_url}")
         print("   Is the ML service running?")
         sys.exit(1)
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")
         sys.exit(1)
 
 

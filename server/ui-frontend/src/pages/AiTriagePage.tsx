@@ -188,7 +188,7 @@ export function AiTriagePage() {
             onClick={onSetContext}
             disabled={busy || !containerId}
           >
-            Set change context (demo)
+            Set change context
           </button>
           <button
             className="rounded-md bg-sky-500/20 text-sky-200 border border-sky-500/40 px-3 py-2 text-sm hover:bg-sky-500/30 disabled:opacity-50"

@@ -17,6 +17,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,6 +35,8 @@ public class GeminiTriageAdapter implements TriagePort {
     
     private final String apiKey;
     private final String model;
+    private final boolean defaultEnableLlm;
+    private final BooleanSupplier enableSupplier;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     
@@ -43,17 +46,22 @@ public class GeminiTriageAdapter implements TriagePort {
     
     public GeminiTriageAdapter(
             @Value("${deepkernel.gemini.api-key:}") String apiKey,
-            @Value("${deepkernel.gemini.model:gemini-pro}") String model) {
+            @Value("${deepkernel.gemini.model:gemini-pro}") String model,
+            @Value("${deepkernel.triage.enable-llm:false}") boolean enableLlm,
+            BooleanSupplier enableSupplier) {
         this.apiKey = apiKey;
         this.model = model;
+        this.defaultEnableLlm = enableLlm;
+        this.enableSupplier = enableSupplier;
         this.restTemplate = new RestTemplate();
         this.objectMapper = new ObjectMapper();
     }
     
     @Override
     public TriageResult triage(AnomalyWindow window, ChangeContext changeContext) {
-        // If API key is configured, try LLM triage
-        if (apiKey != null && !apiKey.isBlank()) {
+        boolean llmEnabled = enableSupplier != null ? enableSupplier.getAsBoolean() : defaultEnableLlm;
+        // If disabled or missing API key, skip LLM
+        if (llmEnabled && apiKey != null && !apiKey.isBlank()) {
             try {
                 return triageWithGemini(window, changeContext);
             } catch (Exception e) {

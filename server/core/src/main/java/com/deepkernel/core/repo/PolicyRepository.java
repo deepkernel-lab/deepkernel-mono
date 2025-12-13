@@ -3,6 +3,7 @@ package com.deepkernel.core.repo;
 import com.deepkernel.contracts.model.Policy;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
@@ -25,6 +26,18 @@ public class PolicyRepository {
         List<Policy> list = findByContainer(containerId);
         if (list.isEmpty()) return null;
         return list.get(list.size() - 1);
+    }
+    
+    public List<Policy> findAll() {
+        return new ArrayList<>(policies);
+    }
+    
+    public int count() {
+        return policies.size();
+    }
+    
+    public void clear() {
+        policies.clear();
     }
 }
 

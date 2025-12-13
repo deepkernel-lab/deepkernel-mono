@@ -26,7 +26,7 @@ function App() {
       <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">DeepKernel</h1>
-          <p className="text-sm text-slate-300">Runtime security · eBPF · Isolation Forest · Live triage</p>
+          <p className="text-sm text-slate-300">Runtime Security For Any Workload</p>
         </div>
         <nav className="flex gap-2">
           <NavLink to="/" label="Dashboard" />

@@ -78,7 +78,7 @@ def main():
     args = parser.parse_args()
     
     if not args.dump_file.exists():
-        print(f"❌ File not found: {args.dump_file}")
+        print(f" File not found: {args.dump_file}")
         sys.exit(1)
     
     print("="*70)
@@ -87,7 +87,7 @@ def main():
     
     header, records = parse_dump_file(args.dump_file)
     
-    print(f"\n📋 Header:")
+    print(f"\n Header:")
     print(f"   Container: {header.container_id}")
     print(f"   Records:   {len(records):,}")
     
@@ -102,7 +102,7 @@ def main():
         curr = records[i].syscall_id
         transitions[(prev, curr)] += 1
     
-    print(f"\n📊 Top {args.top} Syscalls:")
+    print(f"\n Top {args.top} Syscalls:")
     print("-"*70)
     print(f"{'Syscall':<6} {'Name':<20} {'Count':>10} {'Percent':>10}")
     print("-"*70)
@@ -112,7 +112,7 @@ def main():
         pct = 100.0 * count / len(records)
         print(f"{syscall_id:<6} {name:<20} {count:>10,} {pct:>9.2f}%")
     
-    print(f"\n📂 Class Distribution:")
+    print(f"\n Class Distribution:")
     print("-"*50)
     for cls in sorted(class_counts.keys()):
         count = class_counts[cls]
@@ -121,7 +121,7 @@ def main():
         bar = "█" * int(pct / 2)
         print(f"   {name:<6}: {count:>10,} ({pct:>5.1f}%) {bar}")
     
-    print(f"\n🔄 Top 15 Transitions:")
+    print(f"\n Top 15 Transitions:")
     print("-"*70)
     for (prev, curr), count in transitions.most_common(15):
         prev_name = SYSCALL_NAMES.get(prev, str(prev))[:12]
@@ -129,15 +129,15 @@ def main():
         pct = 100.0 * count / len(records)
         print(f"   {prev_name:>12} → {curr_name:<12}: {count:>8,} ({pct:>5.2f}%)")
     
-    print(f"\n💡 What quick_score.py assumes vs YOUR container:")
+    print(f"\n What quick_score.py assumes vs this container:")
     print("-"*70)
     print(f"   quick_score.py 'normal':  read, write, openat, close (generic)")
-    print(f"   YOUR container top 3:     ", end="")
+    print(f"   This container top 3:     ", end="")
     top3 = [SYSCALL_NAMES.get(s, str(s)) for s, _ in syscall_counts.most_common(3)]
     print(", ".join(top3))
     
     if syscall_counts.most_common(1)[0][0] not in [0, 1, 2, 3, 257]:
-        print(f"\n   ⚠️  Your container's top syscall is NOT in quick_score.py's 'normal' set!")
+        print(f"\n     This container's top syscall is NOT in quick_score.py's 'normal' set!")
         print(f"      This explains why synthetic 'normal' is flagged as anomalous.")
 
 
