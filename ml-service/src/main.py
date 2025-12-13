@@ -127,6 +127,15 @@ async def api_health():
     return await health()
 
 
+# ============== Simulation State ==============
+
+# Global simulation state for demo purposes
+_simulation_state: dict = {
+    "enabled": False,
+    "containers": {},  # container_id -> {"score": float, "anomalous": bool}
+}
+
+
 # ============== ML Endpoints ==============
 
 @app.post(
@@ -143,11 +152,27 @@ async def score_window(request: ScoreRequest):
     - **feature_vector**: 594-dimensional feature vector extracted from syscall window
     
     Returns an anomaly score where negative values indicate anomalies.
+    
+    NOTE: If simulation mode is enabled for this container, returns simulated score.
     """
     if registry is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service not initialized",
+        )
+    
+    # Check if simulation is enabled for this container
+    if _simulation_state["enabled"] and request.container_id in _simulation_state["containers"]:
+        sim = _simulation_state["containers"][request.container_id]
+        logger.info(
+            f"[SIMULATION] Returning simulated score for {request.container_id}: "
+            f"score={sim['score']:.4f}, anomalous={sim['anomalous']}"
+        )
+        return ScoreResponse(
+            score=sim["score"],
+            anomalous=sim["anomalous"],
+            container_id=request.container_id,
+            model_version=999,  # Indicate simulation
         )
     
     logger.debug(f"Scoring request for container {request.container_id}")
@@ -348,6 +373,91 @@ async def get_model_stats(container_id: str):
         )
     
     return stats
+
+
+# ============== Simulation Endpoints (Demo Only) ==============
+
+@app.post(
+    "/api/demo/simulate",
+    tags=["Demo"],
+    summary="Enable anomaly simulation for a container",
+)
+async def enable_simulation(
+    container_id: str,
+    score: float = -0.85,
+    anomalous: bool = True,
+):
+    """
+    Enable anomaly score simulation for demo purposes.
+    
+    When enabled, the /api/ml/score endpoint will return the simulated
+    score instead of the real model score.
+    
+    - **container_id**: Container to simulate
+    - **score**: Simulated anomaly score (default: -0.85 = highly anomalous)
+    - **anomalous**: Whether to flag as anomalous (default: True)
+    
+    Example: /api/demo/simulate?container_id=bachat-bank_backend_1&score=-0.9&anomalous=true
+    """
+    _simulation_state["enabled"] = True
+    _simulation_state["containers"][container_id] = {
+        "score": score,
+        "anomalous": anomalous,
+    }
+    
+    logger.warning(
+        f"[SIMULATION ENABLED] {container_id}: score={score}, anomalous={anomalous}"
+    )
+    
+    return {
+        "status": "simulation_enabled",
+        "container_id": container_id,
+        "simulated_score": score,
+        "simulated_anomalous": anomalous,
+        "message": f"All scoring requests for {container_id} will now return simulated values",
+    }
+
+
+@app.post(
+    "/api/demo/simulate/disable",
+    tags=["Demo"],
+    summary="Disable anomaly simulation",
+)
+async def disable_simulation(container_id: str = None):
+    """
+    Disable anomaly score simulation.
+    
+    - **container_id**: Specific container to disable (None = disable all)
+    """
+    if container_id:
+        if container_id in _simulation_state["containers"]:
+            del _simulation_state["containers"][container_id]
+            logger.info(f"[SIMULATION DISABLED] {container_id}")
+        if not _simulation_state["containers"]:
+            _simulation_state["enabled"] = False
+    else:
+        _simulation_state["enabled"] = False
+        _simulation_state["containers"] = {}
+        logger.info("[SIMULATION DISABLED] All containers")
+    
+    return {
+        "status": "simulation_disabled",
+        "container_id": container_id or "all",
+        "active_simulations": list(_simulation_state["containers"].keys()),
+    }
+
+
+@app.get(
+    "/api/demo/simulate/status",
+    tags=["Demo"],
+    summary="Get simulation status",
+)
+async def get_simulation_status():
+    """Get current simulation status for all containers."""
+    return {
+        "enabled": _simulation_state["enabled"],
+        "containers": _simulation_state["containers"],
+    }
 
 
 # ============== Main Entry Point ==============
