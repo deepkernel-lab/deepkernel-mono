@@ -458,7 +458,9 @@ std::string ContainerMapper::execCommand(const std::string& cmd) {
     std::array<char, 4096> buffer;
     std::string result;
     
-    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd.c_str(), "r"), pclose);
+    // Use lambda deleter to avoid GCC warning about function attributes
+    auto pipeDeleter = [](FILE* f) { if (f) pclose(f); };
+    std::unique_ptr<FILE, decltype(pipeDeleter)> pipe(popen(cmd.c_str(), "r"), pipeDeleter);
     if (!pipe) {
         return "";
     }
