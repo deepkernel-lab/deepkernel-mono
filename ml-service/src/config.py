@@ -30,7 +30,8 @@ class Config:
     # Anomaly threshold (scores below this are flagged as anomalous)
     # More negative = more strict (fewer false positives, may miss some anomalies)
     # Less negative = more sensitive (catches more anomalies, more false positives)
-    anomaly_threshold: float = -0.7
+    # -0.65 is good for demos (more sensitive to anomalies)
+    anomaly_threshold: float = -0.65
     
     @classmethod
     def from_env(cls) -> "Config":
@@ -45,7 +46,7 @@ class Config:
             contamination=float(os.getenv("ISOLATION_FOREST_CONTAMINATION", "0.1")),
             max_samples=int(os.getenv("ISOLATION_FOREST_MAX_SAMPLES", "256")),
             random_state=int(os.getenv("ISOLATION_FOREST_RANDOM_STATE", "42")),
-            anomaly_threshold=float(os.getenv("ANOMALY_THRESHOLD", "-0.7")),
+            anomaly_threshold=float(os.getenv("ANOMALY_THRESHOLD", "-0.65")),
         )
 
 
