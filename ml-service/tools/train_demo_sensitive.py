@@ -133,35 +133,41 @@ def generate_tight_baseline(container_profile: str, num_windows: int = 100) -> L
     training_data = []
     
     # Define container-specific baseline profiles
+    # Key insight: We need to set MANY features consistently, not just a few
     profiles = {
         "python-fastapi": {
             # Typical Python/FastAPI backend syscalls
             "class_dist": [0.15, 0.45, 0.25, 0.10, 0.05],  # OTHER, FILE, NET, PROC, MEM
-            "transitions": [(1, 1, 0.3), (1, 2, 0.2), (2, 1, 0.2), (3, 1, 0.1)],
-            "noise": 0.05,  # Very low noise = tight cluster
+            "entropy": 2.0,
+            "unique_trans": 15,
+            "total_syscalls": 500,
+            "noise": 0.02,  # VERY low noise = extremely tight cluster
         },
         "node-express": {
             "class_dist": [0.10, 0.40, 0.35, 0.10, 0.05],
-            "transitions": [(1, 1, 0.25), (2, 2, 0.25), (1, 2, 0.2)],
-            "noise": 0.05,
+            "entropy": 2.2,
+            "unique_trans": 18,
+            "total_syscalls": 600,
+            "noise": 0.02,
         },
         "generic": {
             "class_dist": [0.20, 0.40, 0.20, 0.15, 0.05],
-            "transitions": [(1, 1, 0.3), (1, 2, 0.15), (2, 1, 0.15)],
-            "noise": 0.05,
+            "entropy": 2.1,
+            "unique_trans": 16,
+            "total_syscalls": 450,
+            "noise": 0.02,
         },
     }
     
     profile = profiles.get(container_profile, profiles["generic"])
+    noise = profile["noise"]
     
     for _ in range(num_windows):
         features = [0.0] * 594
         
         # Generate class distribution with tiny noise
         base_dist = profile["class_dist"]
-        noise = profile["noise"]
-        
-        noisy_dist = [max(0, d + random.uniform(-noise, noise)) for d in base_dist]
+        noisy_dist = [max(0.01, d + random.uniform(-noise, noise)) for d in base_dist]
         total = sum(noisy_dist)
         noisy_dist = [d / total for d in noisy_dist]
         
@@ -171,29 +177,97 @@ def generate_tight_baseline(container_profile: str, num_windows: int = 100) -> L
         features[IDX_PROC_RATIO] = noisy_dist[3]
         features[IDX_MEM_RATIO] = noisy_dist[4]
         
-        # Generate transitions
-        for from_cls, to_cls, base_prob in profile["transitions"]:
-            from_idx = from_cls * 5  # Simplified mapping
-            to_idx = to_cls * 5
-            matrix_idx = from_idx * 24 + to_idx
-            if 0 <= matrix_idx < 576:
-                features[matrix_idx] = base_prob + random.uniform(-noise, noise)
+        # Fill MANY Markov matrix cells with consistent patterns
+        # This gives the model more dimensions to compare
+        # FILE class uses indices 5-9, NET uses 10-14, PROC uses 15-19
+        
+        # FILE -> FILE transitions (common for web backends)
+        for i in range(5, 10):
+            for j in range(5, 10):
+                features[i*24 + j] = 0.02 + random.uniform(-noise/2, noise/2)
+        
+        # FILE -> NET transitions
+        for i in range(5, 10):
+            for j in range(10, 15):
+                features[i*24 + j] = 0.01 + random.uniform(-noise/2, noise/2)
+        
+        # NET -> FILE transitions
+        for i in range(10, 15):
+            for j in range(5, 10):
+                features[i*24 + j] = 0.01 + random.uniform(-noise/2, noise/2)
         
         # Entropy (tight range)
-        base_entropy = 2.0
-        features[IDX_ENTROPY] = base_entropy + random.uniform(-0.1, 0.1)
+        features[IDX_ENTROPY] = profile["entropy"] + random.uniform(-noise*5, noise*5)
         
         # Unique transitions (tight range)
-        features[IDX_UNIQUE_TWO_GRAMS] = 15 + random.randint(-2, 2)
+        features[IDX_UNIQUE_TWO_GRAMS] = profile["unique_trans"] + random.randint(-1, 1)
         
         # Other features
         features[IDX_DURATION] = 5.0
-        features[IDX_TOTAL_SYSCALLS] = 500 + random.randint(-50, 50)
-        features[IDX_MEAN_INTER] = 10000 + random.randint(-1000, 1000)
+        features[IDX_TOTAL_SYSCALLS] = profile["total_syscalls"] + random.randint(-20, 20)
+        features[IDX_MEAN_INTER] = 10000 + random.randint(-500, 500)
         
         training_data.append(features)
     
     return training_data
+
+
+def generate_anomalous_pattern(anomaly_type: str = "exfiltration") -> List[float]:
+    """Generate a clearly anomalous pattern for testing."""
+    features = [0.0] * 594
+    
+    if anomaly_type == "exfiltration":
+        # Data exfiltration: heavy network, low file
+        features[IDX_OTHER_RATIO] = 0.05
+        features[IDX_FILE_RATIO] = 0.05
+        features[IDX_NET_RATIO] = 0.80  # Extremely high!
+        features[IDX_PROC_RATIO] = 0.05
+        features[IDX_MEM_RATIO] = 0.05
+        features[IDX_ENTROPY] = 4.0  # High entropy
+        features[IDX_UNIQUE_TWO_GRAMS] = 80
+        features[IDX_TOTAL_SYSCALLS] = 2000
+        
+        # NET -> NET heavy (connection flood)
+        for i in range(10, 15):
+            for j in range(10, 15):
+                features[i*24 + j] = 0.15  # Much higher than baseline
+    
+    elif anomaly_type == "cryptominer":
+        # Cryptominer: heavy CPU/MEM, some network
+        features[IDX_OTHER_RATIO] = 0.10
+        features[IDX_FILE_RATIO] = 0.10
+        features[IDX_NET_RATIO] = 0.20
+        features[IDX_PROC_RATIO] = 0.30  # High process activity
+        features[IDX_MEM_RATIO] = 0.30   # High memory
+        features[IDX_ENTROPY] = 1.5  # Lower entropy (repetitive)
+        features[IDX_UNIQUE_TWO_GRAMS] = 8
+        features[IDX_TOTAL_SYSCALLS] = 3000
+        
+        # MEM -> MEM heavy
+        for i in range(20, 24):
+            for j in range(20, 24):
+                features[i*24 + j] = 0.2
+    
+    elif anomaly_type == "reverse_shell":
+        # Reverse shell: process + network
+        features[IDX_OTHER_RATIO] = 0.10
+        features[IDX_FILE_RATIO] = 0.20
+        features[IDX_NET_RATIO] = 0.35
+        features[IDX_PROC_RATIO] = 0.30  # High process (execve)
+        features[IDX_MEM_RATIO] = 0.05
+        features[IDX_ENTROPY] = 3.5
+        features[IDX_UNIQUE_TWO_GRAMS] = 60
+        features[IDX_TOTAL_SYSCALLS] = 800
+        
+        # PROC -> NET (shell opening connection)
+        for i in range(15, 20):
+            for j in range(10, 15):
+                features[i*24 + j] = 0.1
+    
+    features[IDX_DURATION] = 5.0
+    features[IDX_MEAN_INTER] = 5000
+    
+    return features
 
 
 def parse_dump_file(dump_path: str) -> List[List[Tuple[int, int, int]]]:
@@ -290,41 +364,27 @@ def test_sensitivity(container_id: str, ml_service_url: str, profile: str = "pyt
     print("Testing model sensitivity...")
     print()
     
-    # Generate normal pattern - EXACT same method as training (should be SAFE)
-    normal = generate_tight_baseline(profile, 1)[0]
+    # Generate a normal pattern from the SAME distribution as training
+    normal_samples = generate_tight_baseline(profile, 1)
+    normal = normal_samples[0]
     
-    # Generate TRULY anomalous pattern - completely different structure
-    # The key is to have DIFFERENT non-zero positions in the Markov matrix
-    anomalous = [0.0] * 594
-    
-    # Fill DIFFERENT Markov cells than normal (use process-heavy pattern)
-    # Normal uses FILE-FILE, FILE-NET transitions
-    # Anomalous uses PROC-PROC, MEM-MEM, OTHER-OTHER (positions 15*24+15, 20*24+20, etc.)
-    anomalous[15*24 + 15] = 0.4  # PROC -> PROC (unusual loop)
-    anomalous[15*24 + 18] = 0.2  # PROC -> PROC variant
-    anomalous[20*24 + 20] = 0.3  # MEM -> MEM (memory heavy)
-    anomalous[0*24 + 15] = 0.2   # OTHER -> PROC
-    anomalous[15*24 + 0] = 0.1   # PROC -> OTHER
-    
-    # Inverted class ratios (opposite of normal)
-    anomalous[IDX_FILE_RATIO] = 0.05   # Very low file (normal: 0.45)
-    anomalous[IDX_NET_RATIO] = 0.10    # Low network (normal: 0.25)
-    anomalous[IDX_PROC_RATIO] = 0.50   # Very high proc (normal: 0.10)
-    anomalous[IDX_MEM_RATIO] = 0.25    # High memory (normal: 0.05)
-    anomalous[IDX_OTHER_RATIO] = 0.10  # Different
-    
-    # Very different entropy and transitions
-    anomalous[IDX_ENTROPY] = 4.5       # High chaos (normal: ~2.0)
-    anomalous[IDX_UNIQUE_TWO_GRAMS] = 80  # Many unique (normal: ~15)
-    anomalous[IDX_TOTAL_SYSCALLS] = 2000  # High volume
-    anomalous[IDX_DURATION] = 5.0
-    anomalous[IDX_MEAN_INTER] = 2500   # Fast (normal: ~10000)
+    # Generate clearly anomalous patterns
+    exfil = generate_anomalous_pattern("exfiltration")
+    crypto = generate_anomalous_pattern("cryptominer")
+    shell = generate_anomalous_pattern("reverse_shell")
     
     print(f"Testing against model: {container_id}")
+    print(f"(Threshold: scores < -0.65 are THREAT)")
     print()
     
-    results = []
-    for name, fv in [("Normal (same as training)", normal), ("Anomalous (different structure)", anomalous)]:
+    test_cases = [
+        ("Normal (from baseline distribution)", normal),
+        ("Anomalous: Data Exfiltration", exfil),
+        ("Anomalous: Cryptominer", crypto),
+        ("Anomalous: Reverse Shell", shell),
+    ]
+    
+    for name, fv in test_cases:
         response = requests.post(
             f"{ml_service_url}/api/ml/score",
             json={"container_id": container_id, "feature_vector": fv}
@@ -332,57 +392,14 @@ def test_sensitivity(container_id: str, ml_service_url: str, profile: str = "pyt
         if response.status_code == 200:
             result = response.json()
             status = "THREAT" if result["anomalous"] else "SAFE"
-            print(f"  {name}:")
+            indicator = "✓" if ("Normal" in name and status == "SAFE") or ("Anomalous" in name and status == "THREAT") else "✗"
+            print(f"  {indicator} {name}")
             print(f"    Score: {result['score']:.4f} -> {status}")
-            results.append((name, result['score'], result['anomalous']))
         else:
             print(f"  {name}: Error - {response.text}")
     
-    # Check if results make sense
-    if len(results) == 2:
-        normal_score, anomalous_score = results[0][1], results[1][1]
-        if normal_score < anomalous_score:
-            print()
-            print("  WARNING: Normal scored MORE anomalous than Anomalous!")
-            print("  This suggests the model baseline doesn't match test patterns.")
-            print("  The model may need different training data.")
-
-
-def analyze_training_data(training_data: List[List[float]]):
-    """Print statistics about the training data to understand what the model learned."""
-    print("\nTraining Data Analysis:")
-    print("-" * 40)
-    
-    if not training_data:
-        print("  No training data!")
-        return
-    
-    # Compute mean values for key features
-    arr = np.array(training_data)
-    
-    print(f"  Samples: {len(training_data)}")
-    print(f"  Dimensions: {len(training_data[0])}")
     print()
-    print("  Mean feature values:")
-    print(f"    FILE ratio:   {np.mean(arr[:, IDX_FILE_RATIO]):.4f}")
-    print(f"    NET ratio:    {np.mean(arr[:, IDX_NET_RATIO]):.4f}")
-    print(f"    PROC ratio:   {np.mean(arr[:, IDX_PROC_RATIO]):.4f}")
-    print(f"    MEM ratio:    {np.mean(arr[:, IDX_MEM_RATIO]):.4f}")
-    print(f"    OTHER ratio:  {np.mean(arr[:, IDX_OTHER_RATIO]):.4f}")
-    print(f"    Entropy:      {np.mean(arr[:, IDX_ENTROPY]):.4f}")
-    print(f"    Unique trans: {np.mean(arr[:, IDX_UNIQUE_TWO_GRAMS]):.1f}")
-    print()
-    
-    # Count non-zero Markov cells
-    markov = arr[:, :576]
-    nonzero_cells = np.sum(markov > 0.01, axis=1).mean()
-    print(f"  Avg non-zero Markov cells: {nonzero_cells:.1f} / 576")
-    
-    # Find which Markov cells are commonly used
-    cell_usage = np.mean(markov > 0.01, axis=0)
-    top_cells = np.argsort(cell_usage)[-5:][::-1]
-    print(f"  Most used Markov cells: {list(top_cells)}")
-    print("-" * 40)
+    print("Expected: Normal=SAFE, all Anomalous=THREAT")
 
 
 def main():
@@ -420,11 +437,6 @@ def main():
         default=50,
         help="Number of training samples (fewer = more sensitive, default: 50)"
     )
-    parser.add_argument(
-        "--analyze-only", "-a",
-        action="store_true",
-        help="Only analyze training data, don't train"
-    )
     
     args = parser.parse_args()
     
@@ -455,13 +467,6 @@ def main():
         parser.error("Either --dump-file or --synthetic is required")
     
     print(f"Training data: {len(training_data)} samples, {len(training_data[0])} dimensions")
-    
-    # Analyze training data
-    analyze_training_data(training_data)
-    
-    if args.analyze_only:
-        print("\n--analyze-only specified, skipping training.")
-        return
     
     # Train the TEST model (doesn't affect original)
     result, test_container_id = train_model(args.container, training_data, args.ml_service)
