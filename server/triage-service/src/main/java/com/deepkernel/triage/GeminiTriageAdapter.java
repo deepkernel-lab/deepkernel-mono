@@ -41,12 +41,12 @@ public class GeminiTriageAdapter implements TriagePort {
     private final ObjectMapper objectMapper;
     
     public GeminiTriageAdapter() {
-        this(System.getenv("GEMINI_API_KEY"), "gemini-pro");
+        this(System.getenv("GEMINI_API_KEY"), "gemini-2.5-flash", false, () -> false);
     }
     
     public GeminiTriageAdapter(
             @Value("${deepkernel.gemini.api-key:}") String apiKey,
-            @Value("${deepkernel.gemini.model:gemini-pro}") String model,
+            @Value("${deepkernel.gemini.model:gemini-2.5-flash}") String model,
             @Value("${deepkernel.triage.enable-llm:false}") boolean enableLlm,
             BooleanSupplier enableSupplier) {
         this.apiKey = apiKey;

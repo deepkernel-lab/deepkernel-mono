@@ -41,7 +41,7 @@ public class PortsConfiguration {
     @Value("${deepkernel.gemini.api-key:}")
     private String geminiApiKey;
     
-    @Value("${deepkernel.gemini.model:gemini-pro}")
+    @Value("${deepkernel.gemini.model:gemini-2.5-flash}")
     private String geminiModel;
 
     @Value("${deepkernel.triage.enable-llm:false}")
