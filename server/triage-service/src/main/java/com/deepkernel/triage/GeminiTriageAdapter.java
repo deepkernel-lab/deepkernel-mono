@@ -84,7 +84,7 @@ public class GeminiTriageAdapter implements TriagePort {
             )),
             "generationConfig", Map.of(
                 "temperature", 0.2,
-                "maxOutputTokens", 1024
+                "maxOutputTokens", 256  // keep short to avoid truncation
             )
         );
         
@@ -128,45 +128,30 @@ public class GeminiTriageAdapter implements TriagePort {
         sb.append("- Decide if this is a THREAT or SAFE change.\n");
         sb.append("- If THREAT, propose a Seccomp policy that blocks the suspicious behavior.\n");
         sb.append("\n");
-        sb.append("Respond in this exact JSON format:\n");
-        sb.append("{\n");
-        sb.append("  \"verdict\": \"THREAT\" or \"SAFE\",\n");
-        sb.append("  \"risk_score\": 0.0 to 1.0,\n");
-        sb.append("  \"explanation\": \"Brief explanation of the assessment\",\n");
-        sb.append("  \"policy\": {\n");
-        sb.append("    \"type\": \"SECCOMP\",\n");
-        sb.append("    \"spec\": {\n");
-        sb.append("      \"profile_name\": \"dk-demo-block-connect\",\n");
-        sb.append("      \"syscalls\": [ { \"name\": \"connect\", \"action\": \"SCMP_ACT_ERRNO\" } ]\n");
-        sb.append("    }\n");
-        sb.append("  }\n");
-        sb.append("}\n");
-        sb.append("\n");
-        sb.append("If verdict is SAFE, set policy to null.\n");
+        sb.append("Respond ONLY with a single-line JSON (no markdown, no code fences): ");
+        sb.append("{\"verdict\":\"THREAT|SAFE\",\"risk_score\":0.0-1.0,\"explanation\":\"...\"}\n");
+        sb.append("Keep the response under 200 tokens.\n");
         
         return sb.toString();
     }
     
     private TriageResult parseGeminiResponse(AnomalyWindow window, String response) {
+        String rawText = null;
         try {
             JsonNode root = objectMapper.readTree(response);
-            String textContent = root
+            rawText = root
                 .path("candidates").get(0)
                 .path("content")
                 .path("parts").get(0)
                 .path("text").asText();
-            
-            // Extract JSON from the response (may be wrapped in markdown)
-            String jsonStr = extractJson(textContent);
+
+            String jsonStr = extractJson(rawText);
             JsonNode parsed = objectMapper.readTree(jsonStr);
-            
+
             String verdict = parsed.path("verdict").asText("UNKNOWN");
             double riskScore = parsed.path("risk_score").asDouble(0.5);
             String explanation = parsed.path("explanation").asText("No explanation provided.");
 
-            // Preserve parsed JSON (including optional policy) in llmResponseRaw for downstream policy generation.
-            String parsedJsonForStorage = parsed.toString();
-            
             return new TriageResult(
                 UUID.randomUUID().toString(),
                 window.containerId(),
@@ -174,19 +159,34 @@ public class GeminiTriageAdapter implements TriagePort {
                 riskScore,
                 verdict.toUpperCase(),
                 explanation,
-                parsedJsonForStorage
+                parsed.toString()
             );
         } catch (Exception e) {
-            log.error("Failed to parse Gemini response: {}", e.getMessage());
-            // Return a conservative result on parse failure
+            log.warn("Failed to parse Gemini response; falling back to heuristic with LLM text. err={}", e.getMessage());
+            // Try a regex-based salvage from rawText
+            String verdict = "UNKNOWN";
+            double risk = 0.7;
+            String explanation = rawText != null ? rawText : ("Failed to parse LLM response: " + e.getMessage());
+
+            if (rawText != null) {
+                Matcher mv = Pattern.compile("\"verdict\"\\s*:\\s*\"(\\w+)\"", Pattern.CASE_INSENSITIVE).matcher(rawText);
+                if (mv.find()) verdict = mv.group(1).toUpperCase();
+                Matcher mr = Pattern.compile("\"risk_score\"\\s*:\\s*([0-9.]+)").matcher(rawText);
+                if (mr.find()) {
+                    try { risk = Double.parseDouble(mr.group(1)); } catch (NumberFormatException ignored) {}
+                }
+                Matcher me = Pattern.compile("\"explanation\"\\s*:\\s*\"([^\"]*)\"").matcher(rawText);
+                if (me.find()) explanation = me.group(1);
+            }
+
             return new TriageResult(
                 UUID.randomUUID().toString(),
                 window.containerId(),
                 window.id(),
-                0.7,
-                "UNKNOWN",
-                "Failed to parse LLM response: " + e.getMessage(),
-                response
+                risk,
+                verdict,
+                explanation,
+                rawText != null ? rawText : response
             );
         }
     }
