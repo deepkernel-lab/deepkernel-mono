@@ -20,17 +20,22 @@ struct AgentConfig {
     bool autoBaselineDump{false};
 
     // Container runtime integration
-    // Supports: docker, containerd, crio, auto (auto-detect)
-    std::string containerRuntime{"auto"};
+    // Supports: docker (default, fast), containerd, crio, auto (auto-detect)
+    // Set DK_CONTAINER_RUNTIME=containerd or crio for Kubernetes environments
+    std::string containerRuntime{"docker"};  // Default to docker for performance
     std::string dockerSocketPath{"/var/run/docker.sock"};
     std::string containerdSocketPath{"/run/containerd/containerd.sock"};
     std::string crioSocketPath{"/var/run/crio/crio.sock"};
     std::string crictlPath{"/usr/bin/crictl"};
     int containerMapCacheTTL{60};  // seconds
     
-    // Kubernetes settings
-    bool enableKubernetesApi{true};   // Query K8s API for pod metadata
-    bool preferPodName{true};         // Return pod name instead of container name
+    // Use legacy DockerMapper (faster, Docker-only) vs new ContainerMapper (multi-runtime)
+    // Default: true (use fast legacy mapper for Docker environments)
+    bool useLegacyDockerMapper{true};
+    
+    // Kubernetes settings (only used when useLegacyDockerMapper=false)
+    bool enableKubernetesApi{false};  // Query K8s API for pod metadata
+    bool preferPodName{false};        // Return pod name instead of container name
 
     // Agent HTTP server (for receiving commands from DeepKernel server)
     int agentListenPort{8082};

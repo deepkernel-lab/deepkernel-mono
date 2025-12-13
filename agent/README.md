@@ -89,19 +89,20 @@ sudo ./deepkernel-agent
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DK_CONTAINER_RUNTIME` | `auto` | Runtime: `auto`, `docker`, `containerd`, `crio` |
+| `DK_USE_LEGACY_MAPPER` | `true` | Use fast legacy DockerMapper (recommended for Docker) |
+| `DK_CONTAINER_RUNTIME` | `docker` | Runtime: `docker`, `containerd`, `crio`, `auto` |
 | `DK_DOCKER_SOCKET` | `/var/run/docker.sock` | Docker socket path |
 | `DK_CONTAINERD_SOCKET` | `/run/containerd/containerd.sock` | Containerd socket path |
 | `DK_CRIO_SOCKET` | `/var/run/crio/crio.sock` | CRI-O socket path |
 | `DK_CRICTL_PATH` | `/usr/bin/crictl` | Path to crictl binary |
 | `DK_CONTAINER_CACHE_TTL` | `60` | Container name cache TTL (seconds) |
 
-#### Kubernetes Settings
+#### Kubernetes Settings (only when DK_USE_LEGACY_MAPPER=false)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DK_ENABLE_K8S_API` | `true` | Query Kubernetes API for pod metadata |
-| `DK_PREFER_POD_NAME` | `true` | Use pod name instead of container name |
+| `DK_ENABLE_K8S_API` | `false` | Query Kubernetes API for pod metadata |
+| `DK_PREFER_POD_NAME` | `false` | Use pod name instead of container name |
 
 #### Policy Settings
 

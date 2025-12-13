@@ -56,17 +56,23 @@ Agent::Agent(AgentConfig config)
     : config_(std::move(config)),
       policyEnforcer_(std::make_unique<PolicyEnforcer>(config_.dockerSocketPath, config_.policyDir, config_.policyEnforcementMode)) {
     
-    // Initialize container mapper with runtime-specific configuration
-    ContainerMapper::Config mapperConfig;
-    mapperConfig.dockerSocket = config_.dockerSocketPath;
-    mapperConfig.containerdSocket = config_.containerdSocketPath;
-    mapperConfig.crioSocket = config_.crioSocketPath;
-    mapperConfig.crictlPath = config_.crictlPath;
-    mapperConfig.cacheTTLSeconds = config_.containerMapCacheTTL;
-    mapperConfig.enableKubernetesApi = config_.enableKubernetesApi;
-    mapperConfig.preferPodName = config_.preferPodName;
-    
-    containerMapper_ = std::make_unique<ContainerMapper>(mapperConfig);
+    if (config_.useLegacyDockerMapper) {
+        // Use fast legacy DockerMapper (default for Docker environments)
+        std::cout << "Using legacy DockerMapper (fast, Docker-only)\n";
+        dockerMapper_ = std::make_unique<DockerMapper>(config_.dockerSocketPath, config_.containerMapCacheTTL);
+    } else {
+        // Use new ContainerMapper for K8s/containerd/crio
+        std::cout << "Using ContainerMapper (multi-runtime: containerd/crio/docker)\n";
+        ContainerMapper::Config mapperConfig;
+        mapperConfig.dockerSocket = config_.dockerSocketPath;
+        mapperConfig.containerdSocket = config_.containerdSocketPath;
+        mapperConfig.crioSocket = config_.crioSocketPath;
+        mapperConfig.crictlPath = config_.crictlPath;
+        mapperConfig.cacheTTLSeconds = config_.containerMapCacheTTL;
+        mapperConfig.enableKubernetesApi = config_.enableKubernetesApi;
+        mapperConfig.preferPodName = config_.preferPodName;
+        containerMapper_ = std::make_unique<ContainerMapper>(mapperConfig);
+    }
 }
 
 Agent::~Agent() {
@@ -257,9 +263,15 @@ void Agent::processShortWindow(ContainerBuffer& buffer) {
 }
 
 std::string Agent::mapContainerId(uint64_t cgroupId, uint32_t pid) {
-    // Try to resolve container name from cgroup ID
-    // Works with Docker, containerd, CRI-O, and Kubernetes
-    std::string containerName = containerMapper_->getContainerName(cgroupId, pid);
+    std::string containerName;
+    
+    if (dockerMapper_) {
+        // Use fast legacy DockerMapper
+        containerName = dockerMapper_->getContainerName(cgroupId, pid);
+    } else if (containerMapper_) {
+        // Use multi-runtime ContainerMapper
+        containerName = containerMapper_->getContainerName(cgroupId, pid);
+    }
     
     // If mapping found a name, use it; otherwise fall back to cgroup ID
     if (!containerName.empty()) {

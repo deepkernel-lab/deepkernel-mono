@@ -10,6 +10,7 @@
 #include "agent_server.h"
 #include "buffer_manager.h"
 #include "config.h"
+#include "docker_mapper.h"
 #include "container_mapper.h"
 #include "event_types.h"
 #include "http_client.h"
@@ -28,6 +29,9 @@ public:
 private:
     AgentConfig config_;
     HttpClient http_;
+    // Legacy DockerMapper (fast, Docker-only) - used by default
+    std::unique_ptr<DockerMapper> dockerMapper_;
+    // New ContainerMapper (multi-runtime) - opt-in for K8s/containerd
     std::unique_ptr<ContainerMapper> containerMapper_;
     std::unique_ptr<AgentServer> server_;
     std::unique_ptr<PolicyEnforcer> policyEnforcer_;

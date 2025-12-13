@@ -51,7 +51,9 @@ AgentConfig loadConfig() {
     cfg.autoBaselineDump = envOrDefaultBool("DK_AUTO_BASELINE_DUMP", cfg.autoBaselineDump);
 
     // Container runtime integration
-    // Supports: auto (default), docker, containerd, crio
+    // For Docker environments (default): use legacy fast mapper
+    // For K8s with containerd/crio: set DK_USE_LEGACY_MAPPER=false
+    cfg.useLegacyDockerMapper = envOrDefaultBool("DK_USE_LEGACY_MAPPER", cfg.useLegacyDockerMapper);
     cfg.containerRuntime = envOrDefault("DK_CONTAINER_RUNTIME", cfg.containerRuntime);
     cfg.dockerSocketPath = envOrDefault("DK_DOCKER_SOCKET", cfg.dockerSocketPath);
     cfg.containerdSocketPath = envOrDefault("DK_CONTAINERD_SOCKET", cfg.containerdSocketPath);
@@ -59,7 +61,7 @@ AgentConfig loadConfig() {
     cfg.crictlPath = envOrDefault("DK_CRICTL_PATH", cfg.crictlPath);
     cfg.containerMapCacheTTL = envOrDefaultInt("DK_CONTAINER_CACHE_TTL", cfg.containerMapCacheTTL);
 
-    // Kubernetes settings
+    // Kubernetes settings (only used when DK_USE_LEGACY_MAPPER=false)
     cfg.enableKubernetesApi = envOrDefaultBool("DK_ENABLE_K8S_API", cfg.enableKubernetesApi);
     cfg.preferPodName = envOrDefaultBool("DK_PREFER_POD_NAME", cfg.preferPodName);
 
