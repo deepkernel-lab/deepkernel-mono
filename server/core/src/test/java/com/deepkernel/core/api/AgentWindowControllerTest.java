@@ -16,6 +16,7 @@ import com.deepkernel.core.repo.EventRepository;
 import com.deepkernel.core.repo.PolicyRepository;
 import com.deepkernel.core.repo.TriageResultRepository;
 import com.deepkernel.core.service.FeatureExtractor;
+import com.deepkernel.core.service.TrainingService;
 import com.deepkernel.core.service.model.LiveEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
