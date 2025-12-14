@@ -1,0 +1,14 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8002:8002"
+    networks:
+      - ecommerce
+
+networks:
+  ecommerce:
+    name: ecommerce
