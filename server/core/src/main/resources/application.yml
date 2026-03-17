@@ -16,7 +16,7 @@ deepkernel:
   ws:
     allowed-origins: "*" 
   gemini:
-    api-key: ${GEMINI_API_KEY:AIzaSyD7i8RQ7uDvsFhEtRWX_rL8E3WoIrPb_4s}
+    api-key: ${GEMINI_API_KEY:<redacted>}
     model: ${GEMINI_MODEL:gemini-2.5-flash}
   triage:
     enable-llm: ${DEEPKERNEL_ENABLE_LLM:false}
