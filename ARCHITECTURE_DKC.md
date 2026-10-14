@@ -1,4 +1,4 @@
-# DeepKernel Architecture (Implemented Snapshot)
+# DeepKernel Architecture
 
 ## Overview
 DeepKernel provides runtime syscall anomaly detection per container, with triage and policy enforcement. Components:
@@ -11,18 +11,19 @@ DeepKernel provides runtime syscall anomaly detection per container, with triage
 ## Logical Architecture
 ```mermaid
 flowchart LR
-    Agent[Agent (eBPF+user space)]
-    Server[Server (Spring Boot)]
-    UI[UI (React SPA)]
-    ML[ML Service (optional)]
-    DemoApp[Demo Containers (Bachat Bank)]
-    Agent -->|/api/v1/agent/windows| Server
-    Agent -->|long dump notify| Server
-    Server -->|WS /topic/events| UI
-    UI -->|REST /api/ui/*| Server
-    Server -->|optional scoring| ML
-    Agent -->|policy apply (seccomp)| DemoApp
-    DemoApp -->|syscalls via cgroup| Agent
+    Agent["Agent (eBPF + user space)"]
+    Server["Server (Spring Boot)"]
+    UI["UI (React SPA)"]
+    ML["ML Service (optional)"]
+    DemoApp["Demo Containers (Bachat Bank)"]
+
+    Agent -->|"/api/v1/agent/windows"| Server
+    Agent -->|"long dump notify"| Server
+    Server -->|"WS /topic/events"| UI
+    UI -->|"REST /api/ui/*"| Server
+    Server -->|"optional scoring"| ML
+    Agent -->|"policy apply (seccomp)"| DemoApp
+    DemoApp -->|"syscalls via cgroup"| Agent
 ```
 
 ## Data Flow (Window Scoring)
@@ -42,7 +43,7 @@ flowchart LR
 - Server can request long dump (not fully wired); agent records binary `[header][TraceRecord...]`, notifies `long-dump-complete`.
 - Server (future) slices windows, trains IF model per container; updates `ModelRegistryService`.
 
-## Agent Components (implemented)
+## Agent Components
 - eBPF program: tracepoint sys_enter → ring buffer; syscall classification flags.
 - User-space runtime:
   - DockerMapper: cgroup/pid → container name via Docker socket (regex patterns incl. compose/podman/k8s hashes).
@@ -54,13 +55,13 @@ flowchart LR
 - Config env highlights:
   - `DK_SERVER_URL`, `DK_AGENT_ID`, `DK_CONTAINER_FILTER`, `DK_POLICY_ENFORCEMENT_MODE` (ERRNO|LOG), `DK_POLICY_DIR`, `DK_DOCKER_SOCKET`, etc.
 
-## Server Components (implemented)
+## Server Components
 - Ingestion: `AgentWindowController` handles window POST → score/triage/policy → repos + WS events.
 - Services: FeatureExtractor, ModelRegistryService (in-memory), ContainerViewService (aggregates verdict/score/policy), repos for windows/triage/policies/events.
 - Ports/adapters: stub anomaly engine, stub triage, policy generator (default seccomp high-port block), agent control HTTP adapter (best-effort).
 - WS: `/ws/events` STOMP/SockJS; REST: `/api/ui/containers`, `/models`, `/events`.
 
-## UI (implemented)
+## UI
 - Dashboard (containers + KPIs), Container detail (status, sparkline, verdict, policy, models), Live Events feed, Model Explorer.
 - Consumes REST + `/topic/events`.
 
@@ -79,7 +80,7 @@ flowchart LR
 
 ## Known Limitations (demo state)
 - Anomaly, triage, and model training are stubbed; enforcement is best-effort (seccomp profile written, docker update manual).
-- Agent HTTP server lacks auth/TLS (demo only).
+- Agent HTTP server lacks auth/TLS.
 - Docker mapping uses heuristics and may fallback on non-standard setups.
 - Seccomp connect>=1024 filter may still block unexpected traffic; use LOG mode if needed.
 
