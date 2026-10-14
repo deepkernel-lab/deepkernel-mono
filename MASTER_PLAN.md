@@ -1,17 +1,12 @@
-# DeepKernel – Master Plan
+# DeepKernel – Detailed Design
 
-**Role:** Principal Software Engineer
-**Project Name:** `DeepKernel` – Intelligent Runtime Security for Any Workload
-
-This document is the **single source of truth** for implementing DeepKernel end-to-end in one repository. It defines:
+This document defines following elements of DeepKernel design:
 
 * Architecture and components (agent, server, ML, LLM, UI)
 * Data structures and contracts (JSON/binary)
 * Feature engineering for Isolation Forest on syscall flows
 * Continuous learning loop and CI/CD integration
 * Frontend views and APIs
-
-The goal is that an AI coding agent (Codex, Cursor, Aider, Antigravity) can read this file and generate the entire implementation.
 
 ---
 
@@ -42,53 +37,7 @@ DeepKernel is a runtime security platform that:
 
 ---
 
-## 2. Repository Layout
-
-Single repo with multiple modules:
-
-```text
-deepkernel/
-  MASTER_PLAN.md
-
-  agent/                      # deepkernel-agent (C++/libbpf)
-    src/
-    include/
-    ebpf/
-    CMakeLists.txt
-    config/
-
-  server/                     # deepkernel-server (Java Spring Boot)
-    core/                     # ingest, orchestration, APIs
-    anomaly-engine/           # Isolation Forest integration
-    triage-service/           # LLM triage client (Gemini)
-    cicd-integration/         # Git/GitHub/GitLab integration
-    policy-engine/            # seccomp/app-armor/netpolicy generator
-    ui-frontend/              # React/Tailwind frontend (SPA)
-    contracts/                # shared DTOs/JSON schemas
-    build.gradle / pom.xml
-
-  ml-service/                 # optional Python ML service (if not embedded in server)
-    src/
-    requirements.txt
-
-  contracts/                  # language-agnostic contracts (JSON schemas / protobuf)
-    agent/
-    server/
-    ui/
-    cicd/
-
-  infra/                      # deployment configs
-    k8s/
-    docker/
-    helm/
-
-  docs/
-    API_SPEC.md
-    FEATURES.md               # details of feature vectors
-    UI_DESIGN.md              # optional extracted UI doc (can be generated from this)
-```
-
-You can choose to keep ML embedded in Java or use `ml-service` as a separate Python microservice. This plan assumes server-core orchestrates everything via clearly defined ports and adapters.
+See README.md.
 
 ---
 
@@ -300,7 +249,7 @@ File layout:
 [dk_trace_header_t][record1][record2]...[recordN]
 ```
 
-### 5.2 Short Window Payload (JSON over HTTP/gRPC)
+### 5.2 Short Window Payload
 
 Endpoint: `POST /api/v1/agent/windows`
 
@@ -926,7 +875,7 @@ Frontend subscribes to `/ws/events` and updates UI in real time.
 
 ---
 
-## 11. End-to-End Flows (Narrative)
+## 11. End-to-End Flows
 
 ### 11.1 Baseline Training Flow
 
