@@ -28,15 +28,15 @@ deepkernel/
 └─ docker-compose.demo.yml       # demo scaffold (server/ml/mock-agent)
 ```
 
-## End-to-End Flow (demo path)
+## End-to-End Flow
 1. Agent captures syscalls via eBPF, batches 5s windows, and POSTs `/api/v1/agent/windows` to the server.
 2. Server extracts features, scores via anomaly engine, triages (stub), generates policy (stub), stores state, and publishes WebSocket events (`WINDOW_SCORED`, `TRIAGE_RESULT`, `POLICY_APPLIED`).
 3. UI consumes REST (`/api/ui/containers`, `/models`, `/events`) and WS (`/ws/events`) to render dashboard, container detail, live feed, and model explorer.
-4. Optional ML service can be called if remote mode is enabled (stubbed for now).
+4. Optional ML service can be called if remote mode is enabled.
 
 ## Building Components
 
-### Prerequisites (Ubuntu)
+### Prerequisites
 - System: `build-essential`, `git`, `pkg-config`
 - Agent/BPF: CMake ≥3.16, `clang`, `llvm`, `libbpf-dev`, `libelf-dev`, `zlib1g-dev`, `libcurl4-openssl-dev`
 - Server: JDK 17, Gradle wrapper (bundled)
